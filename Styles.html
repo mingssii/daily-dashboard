@@ -1,0 +1,188 @@
+<style>
+  :root {
+    --font-sans: 'Inter', 'IBM Plex Sans Thai', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+    /* 1A: Warm Paper / Stone Low-Glare Light Palette (Eye-Comfort Mode) */
+    --bg-app: #F5F4F0;           /* Warm Stone-100 paper canvas (eliminates blue-light glare) */
+    --bg-sidebar: #EFECE6;       /* Warm Stone-150 sidebar surface */
+    --bg-surface: #FAF9F6;       /* Alabaster soft off-white card (replaces harsh #FFFFFF) */
+    --bg-surface-muted: #EBE8E0; /* Warm muted fill for inputs, pills, sticky headers */
+    --border-subtle: #E2DFD7;    /* Crisp 1px warm stone border */
+    --border-hover: #C7C2B6;     /* Interactive border hover */
+    --text-primary: #1C1917;     /* Stone-900 warm charcoal ink */
+    --text-secondary: #57534E;   /* Stone-600 secondary label ink */
+    --text-muted: #78716C;       /* Stone-500 caption ink */
+    --shadow-card: 0 1px 2px 0 rgba(28, 25, 23, 0.04);
+  }
+
+  html.dark {
+    --bg-app: #090D16;           /* Slate-950 deep neutral canvas */
+    --bg-sidebar: #0B111E;       /* Deep sidebar surface */
+    --bg-surface: #0F172A;       /* Slate-900 card surface */
+    --bg-surface-muted: #1E293B; /* Slate-800 muted surface */
+    --border-subtle: #1E293B;    /* Slate-800 crisp 1px border */
+    --border-hover: #334155;     /* Slate-700 hover border */
+    --text-primary: #F8FAFC;     /* Slate-50 main text */
+    --text-secondary: #CBD5E1;   /* Slate-300 secondary text */
+    --text-muted: #94A3B8;       /* Slate-400 captions */
+    --shadow-card: 0 1px 2px 0 rgba(0, 0, 0, 0.30);
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-app);
+    color: var(--text-primary);
+    line-height: 1.6; /* Prevents Thai tone marks (วรรณยุกต์) from clipping */
+    transition: background-color 0.15s ease, color 0.15s ease;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Harmonize Tailwind utility surfaces in Light Mode to Warm Paper (#FAF9F6 / #F5F4F0) */
+  html:not(.dark) .bg-white {
+    background-color: var(--bg-surface) !important;
+  }
+  html:not(.dark) .bg-slate-50,
+  html:not(.dark) .bg-slate-50\/80,
+  html:not(.dark) .bg-slate-50\/50 {
+    background-color: #F3F1EC !important;
+  }
+  html:not(.dark) .bg-slate-100 {
+    background-color: var(--bg-surface-muted) !important;
+  }
+  html:not(.dark) .border-slate-200,
+  html:not(.dark) .border-slate-200\/80,
+  html:not(.dark) .border-slate-100 {
+    border-color: var(--border-subtle) !important;
+  }
+  html:not(.dark) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+    border-color: var(--border-subtle) !important;
+  }
+
+  /* Minimalist Executive Card (1px crisp border, Warm Paper surface) */
+  .saas-card {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-card);
+    border-radius: 0.75rem;
+    transition: border-color 0.15s ease, background-color 0.15s ease;
+  }
+
+  .saas-card-interactive:hover {
+    border-color: var(--border-hover);
+  }
+
+  /* Sticky Top Context Bar */
+  .app-header {
+    background-color: rgba(245, 244, 240, 0.90);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  html.dark .app-header {
+    background-color: rgba(9, 13, 22, 0.90);
+  }
+
+  /* Left Sidebar Workspace Navigation (2A) */
+  .app-sidebar {
+    background-color: var(--bg-sidebar);
+    border-right: 1px solid var(--border-subtle);
+    transition: width 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sidebar-nav-item {
+    color: var(--text-secondary);
+    border: 1px solid transparent;
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+
+  .sidebar-nav-item:hover {
+    background-color: var(--bg-surface-muted);
+    color: var(--text-primary);
+  }
+
+  .sidebar-nav-active {
+    background-color: var(--bg-surface) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-subtle) !important;
+    font-weight: 600;
+    box-shadow: 0 1px 2px 0 rgba(28, 25, 23, 0.05);
+  }
+
+  html.dark .sidebar-nav-active {
+    background-color: #1E293B !important;
+    color: #F8FAFC !important;
+    border-color: #334155 !important;
+  }
+
+  /* Collapsed Sidebar State (Desktop Icon Rail) */
+  aside.sidebar-collapsed {
+    width: 4.25rem !important;
+  }
+  aside.sidebar-collapsed .sidebar-label,
+  aside.sidebar-collapsed .sidebar-badge,
+  aside.sidebar-collapsed .sidebar-section-title,
+  aside.sidebar-collapsed .sidebar-footer-detail {
+    display: none !important;
+  }
+  aside.sidebar-collapsed .sidebar-nav-item {
+    justify-content: center !important;
+    padding-left: 0.5rem !important;
+    padding-right: 0.5rem !important;
+  }
+
+  /* Mobile Bottom Navigation Active State */
+  .mobile-nav-active {
+    color: var(--text-primary) !important;
+    font-weight: 600;
+  }
+  .mobile-nav-active .mobile-nav-indicator {
+    background-color: var(--text-primary);
+  }
+
+  /* Tabular numerals for financial and nutritional precision */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+
+  /* Subtle Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(120, 113, 108, 0.28);
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(120, 113, 108, 0.48);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Chart container wrapper */
+  .chart-box {
+    position: relative;
+    width: 100%;
+  }
+</style>

@@ -1,0 +1,2184 @@
+<script>
+/**
+ * Unified Personal Life Dashboard (Finance & Nutrition)
+ * File: App.html
+ * Frontend Single-Page Application (SPA) Controller & High Data-Ink Chart.js Visualizers.
+ * Style Direction: Minimalist Executive (Shadcn / Linear) — Anti-AI Slop Compliant.
+ */
+
+const APP_STATE = {
+  mode: window.__INITIAL_MODE__ || 'overview',
+  data: null,
+  isSyncing: false,
+  finance: {
+    period: 'ALL',
+    startDate: '',
+    endDate: '',
+    type: 'ALL',
+    payMethod: 'ALL',
+    trendGranularity: 'daily',
+    selectedMainCat: 'Food & Drink',
+    filteredTransactions: []
+  },
+  nutrition: {
+    preset: '7d',
+    singleDate: '',
+    startDate: '',
+    endDate: '',
+    filteredDays: [],
+    filteredMeals: []
+  }
+};
+
+const CHARTS = {
+  overviewCross: null,
+  finTrend: null,
+  finCategory: null,
+  finPayment: null,
+  nutCalorieBand: null,
+  nutMacros: null,
+  nutMealType: null,
+  nutBodyWorkout: null
+};
+
+/* ==========================================================================
+ * 1. INITIALIZATION & THEME MANAGEMENT
+ * ========================================================================== */
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.Chart) {
+    Chart.defaults.font.family = "'Inter', 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif";
+  }
+  try {
+    if (localStorage.getItem('uld_sidebar_collapsed') === '1') {
+      const sb = document.getElementById('appSidebar');
+      if (sb) sb.classList.add('sidebar-collapsed');
+    }
+  } catch (e) {}
+  const codeBlock = document.getElementById('scriptableCodeBlock');
+  if (codeBlock) {
+    codeBlock.textContent = getScriptableWidgetSourceCode_();
+  }
+  if (window.lucide) {
+    lucide.createIcons();
+  }
+  handleSyncData(false);
+});
+
+function isDarkMode() {
+  return document.documentElement.classList.contains('dark');
+}
+
+function toggleTheme() {
+  const root = document.documentElement;
+  const nextDark = !root.classList.contains('dark');
+  if (nextDark) {
+    root.classList.add('dark');
+    try { localStorage.setItem('uld_theme', 'dark'); } catch (e) {}
+  } else {
+    root.classList.remove('dark');
+    try { localStorage.setItem('uld_theme', 'light'); } catch (e) {}
+  }
+  if (APP_STATE.data) {
+    renderActiveModeCharts();
+    renderFinanceSubCategoryDrilldown();
+  }
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('appSidebar');
+  if (!sb) return;
+  const collapsed = sb.classList.toggle('sidebar-collapsed');
+  try {
+    localStorage.setItem('uld_sidebar_collapsed', collapsed ? '1' : '0');
+  } catch (e) {}
+}
+
+function showFutureModuleToast(moduleName) {
+  showToast(
+    'Module Slot: ' + moduleName,
+    'เตรียมโครงสร้างเมนูไว้รองรับการขยาย Dashboard ในอนาคต เพียงผูก Google Sheet ใหม่ใน DataService.gs'
+  );
+}
+
+function getChartThemeColors() {
+  const dark = isDarkMode();
+  return {
+    text: dark ? '#CBD5E1' : '#292524',
+    muted: dark ? '#94A3B8' : '#78716C',
+    grid: dark ? 'rgba(148, 163, 184, 0.10)' : '#EAE7E0',
+    primaryBar: dark ? '#E2E8F0' : '#1C1917',
+    secondaryBar: dark ? '#475569' : '#78716C',
+    accentBlue: dark ? '#3B82F6' : '#2563EB',
+    positive: '#059669',
+    negative: '#E11D48',
+    warning: '#D97706',
+    tooltipBg: dark ? '#0F172A' : '#FAF9F6',
+    tooltipText: dark ? '#F8FAFC' : '#1C1917',
+    tooltipBorder: dark ? '#334155' : '#E2DFD7'
+  };
+}
+
+/**
+ * Instant SPA Mode Switcher ('overview' | 'finance' | 'nutrition')
+ */
+function switchMode(mode) {
+  const validModes = ['overview', 'finance', 'nutrition'];
+  const target = validModes.indexOf(mode) !== -1 ? mode : 'overview';
+  APP_STATE.mode = target;
+
+  const titles = {
+    overview: 'Overview & Cross-Insights',
+    finance: 'Finance & Cashflow',
+    nutrition: 'Nutrition & Health'
+  };
+  setText('topHeaderViewTitle', titles[target] || 'Overview & Cross-Insights');
+
+  validModes.forEach(function(m) {
+    const navBtn = document.getElementById('nav-' + m);
+    const mnavBtn = document.getElementById('mnav-' + m);
+    const section = document.getElementById('view-' + m);
+    if (navBtn) {
+      navBtn.classList.toggle('sidebar-nav-active', m === target);
+      navBtn.classList.toggle('mode-tab-active', m === target);
+    }
+    if (mnavBtn) {
+      mnavBtn.classList.toggle('mobile-nav-active', m === target);
+    }
+    if (section) {
+      if (m === target && APP_STATE.data) {
+        section.classList.remove('hidden');
+      } else {
+        section.classList.add('hidden');
+      }
+    }
+  });
+
+  if (APP_STATE.data) {
+    renderActiveModeCharts();
+  }
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderActiveModeCharts() {
+  if (!APP_STATE.data) return;
+  if (APP_STATE.mode === 'overview') {
+    renderOverviewCrossChart();
+  } else if (APP_STATE.mode === 'finance') {
+    renderFinanceCharts();
+  } else if (APP_STATE.mode === 'nutrition') {
+    renderNutritionCharts();
+  }
+}
+
+/* ==========================================================================
+ * 2. DATA FETCHING & IN-SHEET REBUILD RPC
+ * ========================================================================== */
+
+function handleSyncData(forceRefresh) {
+  if (APP_STATE.isSyncing) return;
+  APP_STATE.isSyncing = true;
+  setSyncSpinner(true);
+  hideErrorState();
+
+  if (!APP_STATE.data) {
+    document.getElementById('loadingSkeleton').classList.remove('hidden');
+  }
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(response) {
+        APP_STATE.isSyncing = false;
+        setSyncSpinner(false);
+        onDataLoaded(response, forceRefresh);
+      })
+      .withFailureHandler(function(err) {
+        APP_STATE.isSyncing = false;
+        setSyncSpinner(false);
+        document.getElementById('loadingSkeleton').classList.add('hidden');
+        showErrorState(err && err.message ? err.message : String(err));
+      })
+      .getUnifiedDashboardData(Boolean(forceRefresh));
+  } else {
+    // GitHub Pages Launchpad / Local Showcase Mode outside Google Apps Script host
+    setTimeout(function() {
+      APP_STATE.isSyncing = false;
+      setSyncSpinner(false);
+      const demo = buildLocalPreviewDataset_();
+      const badge = document.getElementById('dataSourceBadge');
+      if (badge) {
+        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span>GitHub Pages Showcase</span>';
+      }
+      const ghBanner = document.getElementById('githubLaunchpadBanner');
+      if (ghBanner) ghBanner.classList.remove('hidden');
+      const sbVault = document.getElementById('sidebarLiveVaultLink');
+      if (sbVault) sbVault.classList.remove('hidden');
+      const hdrVault = document.getElementById('headerLiveVaultBtn');
+      if (hdrVault) {
+        hdrVault.classList.remove('hidden');
+        hdrVault.classList.add('inline-flex');
+      }
+      onDataLoaded(demo, forceRefresh);
+    }, 240);
+  }
+}
+
+function onDataLoaded(response, wasForced) {
+  document.getElementById('loadingSkeleton').classList.add('hidden');
+
+  if (!response || !response.success) {
+    showErrorState((response && response.error) || 'เกิดข้อผิดพลาดในการโหลดข้อมูลจาก Google Sheets');
+    return;
+  }
+
+  APP_STATE.data = response;
+
+  // Update header timestamp
+  const meta = response.meta || {};
+  const stats = meta.stats || {};
+  const cacheLabel = meta.fromCache ? 'Cached' : 'Fresh Sync';
+  document.getElementById('lastSyncedText').textContent =
+    'อัปเดต: ' + (meta.generatedAt || '-') + ' (' + cacheLabel +
+    ' • Finance ' + ((stats.outcomeParsedRows || 0) + (stats.incomeParsedRows || 0)) + ' รายการ' +
+    ' • Food ' + (stats.foodUniqueRows || 0) + ' มื้อ)';
+
+  // Initialize Filter Dropdowns & Default Selections
+  initFinanceControls();
+  initNutritionControls();
+
+  // Render all 3 views
+  renderOverviewHub();
+  applyFinanceFilters();
+  applyNutritionFilters();
+
+  // Reveal current active mode
+  switchMode(APP_STATE.mode);
+
+  if (wasForced) {
+    showToast('ซิงค์ข้อมูลสำเร็จ', 'ดึงข้อมูลล่าสุดจาก Daily_Finance และ Daily_Food เรียบร้อยแล้ว');
+  }
+}
+
+function handleRebuildInSheetDashboards() {
+  const btn = document.getElementById('rebuildSheetsBtn');
+  if (btn) btn.disabled = true;
+  showToast('กำลังจัดหน้า Google Sheets...', 'กำลังสร้างและผูกสูตรใน Monthly_Dashboard และ Daily_Nutrition_Summary');
+
+  if (typeof google !== 'undefined' && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (btn) btn.disabled = false;
+        if (res && res.success) {
+          showToast(
+            'อัปเดตตารางในชีตสำเร็จ',
+            'อัปเดต Monthly_Dashboard และ Daily_Nutrition_Summary เมื่อ ' + res.rebuiltAt
+          );
+        } else {
+          showToast('ไม่สามารถอัปเดตตารางได้', (res && res.error) || 'Unknown error', true);
+        }
+      })
+      .withFailureHandler(function(err) {
+        if (btn) btn.disabled = false;
+        showToast('เกิดข้อผิดพลาด', err && err.message ? err.message : String(err), true);
+      })
+      .rebuildInSheetDashboards();
+  } else {
+    setTimeout(function() {
+      if (btn) btn.disabled = false;
+      showToast('Preview Mode', 'เมื่อรันบน Google Apps Script ปุ่มนี้จะจัดหน้าชีตทั้ง 2 ไฟล์ให้อัตโนมัติ');
+    }, 500);
+  }
+}
+
+/* ==========================================================================
+ * 3. VIEW 1: OVERVIEW HUB & CROSS-INSIGHTS
+ * ========================================================================== */
+
+function renderOverviewHub() {
+  const d = APP_STATE.data;
+  if (!d) return;
+
+  const activeMonth = d.crossInsights.activeMonth || d.meta.currentMonth;
+  const monthSum = d.finance.monthlySummaries[activeMonth] || d.finance.monthlySummaries.ALL || {
+    income: 0,
+    expense: 0,
+    investmentTransfer: 0,
+    netCashflow: 0,
+    budgetRemaining: 10000,
+    budgetUsedPct: 0
+  };
+
+  // Landing Card 1: Finance Summary
+  setText('ovCardFinMonth', activeMonth);
+  setText('ovCardFinExpense', formatTHB(monthSum.expense, 0));
+  setText('ovCardFinBudgetLeft', formatTHB(monthSum.budgetRemaining, 0));
+  setText('ovCardFinSubBurn', formatTHB(d.finance.activeSubscriptionBurn, 0));
+
+  // Landing Card 2: Latest Day Nutrition Summary
+  const latestDay = (d.nutrition.dailySummaries && d.nutrition.dailySummaries[0]) || {
+    date: d.meta.today,
+    proteinG: 0,
+    proteinStatus: 'red',
+    calLow: 0,
+    calHigh: 0,
+    calMid: 0,
+    calorieStatus: 'under',
+    vegFruit: 0,
+    mealCount: 0
+  };
+
+  setText('ovCardNutDate', latestDay.date);
+  setText('ovCardNutProtein', formatNum(latestDay.proteinG, 1) + ' / 115 g');
+  setText('ovCardNutCalorie', formatNum(latestDay.calMid, 0) + ' kcal');
+  setText('ovCardNutVeg', formatNum(latestDay.vegFruit, 1) + ' / 3.0');
+
+  // Executive Pulse 1: Monthly Budget 10,000 THB
+  const usedPct = Math.max(0, monthSum.budgetUsedPct || 0);
+  setText('ovBudgetSpent', formatTHB(monthSum.expense, 0));
+  setText('ovBudgetPctText', 'ใช้ไป ' + formatNum(usedPct, 1) + '% (' + activeMonth + ')');
+  setText(
+    'ovBudgetRemainingText',
+    monthSum.budgetRemaining >= 0
+      ? 'คงเหลือ ' + formatTHB(monthSum.budgetRemaining, 0)
+      : 'เกินงบ ' + formatTHB(Math.abs(monthSum.budgetRemaining), 0)
+  );
+
+  const budgetBar = document.getElementById('ovBudgetBar');
+  const budgetBadge = document.getElementById('ovBudgetBadge');
+  budgetBar.style.width = Math.min(usedPct, 100) + '%';
+  if (usedPct <= 80) {
+    budgetBar.className = 'h-full bg-slate-900 dark:bg-slate-200 rounded-full transition-all duration-300';
+    budgetBadge.className = getSemanticBadgeClass_('positive');
+    budgetBadge.textContent = 'On Track (' + formatNum(usedPct, 0) + '%)';
+  } else if (usedPct <= 100) {
+    budgetBar.className = 'h-full bg-amber-500 rounded-full transition-all duration-300';
+    budgetBadge.className = getSemanticBadgeClass_('warning');
+    budgetBadge.textContent = 'Near Limit (' + formatNum(usedPct, 0) + '%)';
+  } else {
+    budgetBar.className = 'h-full bg-rose-600 rounded-full transition-all duration-300';
+    budgetBadge.className = getSemanticBadgeClass_('negative');
+    budgetBadge.textContent = 'Over Budget';
+  }
+
+  // Executive Pulse 2: Protein Status (115 g/day)
+  const proteinPct = Math.min(100, (latestDay.proteinG / 115) * 100);
+  setText('ovProteinVal', formatNum(latestDay.proteinG, 1) + ' g');
+  setText('ovProteinDateText', latestDay.date);
+  const proteinDiff = 115 - latestDay.proteinG;
+  setText(
+    'ovProteinDiffText',
+    proteinDiff <= 0 ? '+' + formatNum(Math.abs(proteinDiff), 1) + 'g vs เป้า' : 'ขาดอีก ' + formatNum(proteinDiff, 1) + 'g'
+  );
+
+  const pBadge = document.getElementById('ovProteinBadge');
+  const pBar = document.getElementById('ovProteinBar');
+  pBar.style.width = proteinPct + '%';
+  applyProteinBadgeStyle_(pBadge, pBar, latestDay.proteinG);
+
+  // Executive Pulse 3: Calorie Range Band
+  setText('ovCalorieMidVal', formatNum(latestDay.calMid, 0) + ' kcal');
+  setText('ovCalorieBandSub', '(' + formatNum(latestDay.calLow, 0) + '–' + formatNum(latestDay.calHigh, 0) + ')');
+  setText('ovVegPortionText', 'ผักผลไม้: ' + formatNum(latestDay.vegFruit, 1) + ' / 3.0 ส่วน');
+  setText('ovMealsCountText', latestDay.mealCount + ' มื้อ');
+
+  const calBar = document.getElementById('ovCalorieBar');
+  const calBadge = document.getElementById('ovCalorieBadge');
+  calBar.style.width = Math.min(100, (latestDay.calMid / 2100) * 100) + '%';
+  applyCalorieBadgeStyle_(calBadge, calBar, latestDay.calMid);
+
+  // Executive Pulse 4: Net Cashflow & Active Subscriptions
+  const netEl = document.getElementById('ovNetCashflowVal');
+  netEl.textContent = (monthSum.netCashflow >= 0 ? '+' : '-') + formatTHB(Math.abs(monthSum.netCashflow), 0);
+  netEl.className = 'text-2xl font-semibold tracking-tight tabular-nums ' +
+    (monthSum.netCashflow >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400');
+  setText('ovIncomeMini', formatTHB(monthSum.income, 0));
+  setText('ovInvestMini', formatTHB(monthSum.investmentTransfer, 0));
+
+  const subDueCount = d.finance.dueSoonCount || 0;
+  const subDueBadge = document.getElementById('ovSubDueBadge');
+  if (subDueBadge) {
+    subDueBadge.textContent = subDueCount > 0 ? (subDueCount + ' ใกล้ตัดรอบ') : 'ไม่มีใกล้ตัดรอบ';
+    subDueBadge.className = getSemanticBadgeClass_(subDueCount > 0 ? 'warning' : 'neutral');
+  }
+
+  // Cross-Insight Metrics
+  const ci = d.crossInsights;
+  setText('ciThbPerProtein', '฿' + formatNum(ci.thbPerGramProtein, 2));
+  setText('ciAvgFoodPerDay', formatTHB(ci.avgDailyFoodSpendTHB, 0));
+  setText('ciAvgFoodPerMeal', 'เฉลี่ยต่อมื้อ: ' + formatTHB(ci.avgSpendPerMealTHB, 0) + ' / มื้อ');
+  setText('ciKcalPerThb', formatNum(ci.kcalPerTHB, 1));
+  setText('ciTotalFoodSpendLabel', 'ยอดรวมหมวด Food & Drink: ' + formatTHB(ci.totalFoodSpendTHB, 0));
+
+  const stats = d.meta.stats || {};
+  setText(
+    'ciHygieneDetail',
+    'กู้คืนแถวเลื่อน ' + (stats.outcomeShiftedRowsRecovered || 0) +
+    ' แถว • ตัดมื้อซ้ำ ' + (stats.foodDuplicatesRemoved || 0) + ' แถว'
+  );
+  setText(
+    'crossInsightMetaBadge',
+    'วิเคราะห์จาก ' + (ci.foodSpendDaysCount || 0) + ' วันที่มีรายจ่ายอาหาร × ' + (ci.nutritionDaysCount || 0) + ' วันที่มีบันทึกโภชนาการ'
+  );
+
+  // Update Sidebar Quick Badges
+  setText('sidebarFinBadge', formatNum(usedPct, 0) + '%');
+  setText('sidebarNutBadge', formatNum(latestDay.proteinG, 0) + 'g');
+
+  // Update iOS Medium Widget Live Preview
+  updateWidgetPreview_(activeMonth, monthSum, latestDay);
+}
+
+function renderOverviewCrossChart() {
+  const ctx = document.getElementById('overviewCrossChart');
+  if (!ctx || !APP_STATE.data) return;
+
+  const series = (APP_STATE.data.crossInsights.dailyCorrelation || []).slice(-14);
+  const labels = series.map(function(item) { return item.date.slice(5); });
+  const spendData = series.map(function(item) { return item.foodSpendTHB; });
+  const proteinData = series.map(function(item) { return item.proteinG; });
+  const targetLine = series.map(function() { return 115; });
+
+  const colors = getChartThemeColors();
+  if (CHARTS.overviewCross) CHARTS.overviewCross.destroy();
+
+  CHARTS.overviewCross = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: 'bar',
+          label: 'ค่าอาหาร Food & Drink (THB)',
+          data: spendData,
+          backgroundColor: isDarkMode() ? 'rgba(148, 163, 184, 0.35)' : 'rgba(28, 25, 23, 0.82)',
+          borderRadius: 4,
+          maxBarThickness: 28,
+          yAxisID: 'ySpend',
+          order: 2
+        },
+        {
+          type: 'line',
+          label: 'โปรตีนที่ได้รับ (g/day)',
+          data: proteinData,
+          borderColor: colors.positive,
+          backgroundColor: colors.positive,
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: colors.positive,
+          tension: 0.25,
+          yAxisID: 'yProtein',
+          order: 1
+        },
+        {
+          type: 'line',
+          label: 'เป้าหมายโปรตีน (115g)',
+          data: targetLine,
+          borderColor: colors.warning,
+          borderDash: [5, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          yAxisID: 'yProtein',
+          order: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: colors.text, font: { size: 11 }, boxWidth: 12 }
+        },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { display: false }
+        },
+        ySpend: {
+          type: 'linear',
+          position: 'left',
+          beginAtZero: true,
+          title: { display: true, text: 'THB (บาท)', color: colors.muted, font: { size: 11 } },
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        },
+        yProtein: {
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          suggestedMax: 140,
+          title: { display: true, text: 'Protein (g)', color: colors.muted, font: { size: 11 } },
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
+/* ==========================================================================
+ * 4. VIEW 2: FINANCE DASHBOARD CONTROLLER
+ * ========================================================================== */
+
+function initFinanceControls() {
+  const fin = APP_STATE.data.finance;
+  const periodSelect = document.getElementById('finPeriodFilter');
+  const paySelect = document.getElementById('finPaymentFilter');
+  const tableCatSelect = document.getElementById('finTableCatFilter');
+
+  const activeMonth = APP_STATE.data.crossInsights.activeMonth || fin.latestMonth || 'ALL';
+  periodSelect.innerHTML = '<option value="ALL">ทุกเดือน (All Periods)</option>';
+  (fin.availableMonths || []).forEach(function(m) {
+    const opt = document.createElement('option');
+    opt.value = m;
+    opt.textContent = 'เดือน ' + m;
+    periodSelect.appendChild(opt);
+  });
+  periodSelect.value = activeMonth;
+  APP_STATE.finance.period = activeMonth;
+
+  paySelect.innerHTML = '<option value="ALL">ทุกช่องทาง (All Methods)</option>';
+  (fin.availablePaymentMethods || []).forEach(function(pm) {
+    const opt = document.createElement('option');
+    opt.value = pm;
+    opt.textContent = pm;
+    paySelect.appendChild(opt);
+  });
+
+  tableCatSelect.innerHTML = '<option value="ALL">ทุกหมวดหลัก (All Categories)</option>';
+  (fin.availableCategories || []).forEach(function(cat) {
+    const opt = document.createElement('option');
+    opt.value = cat;
+    opt.textContent = cat;
+    tableCatSelect.appendChild(opt);
+  });
+
+  renderSubscriptionTrackerWidget(fin.subscriptions || [], fin.activeSubscriptionBurn || 0);
+}
+
+function resetFinanceFilters() {
+  document.getElementById('finPeriodFilter').value = 'ALL';
+  document.getElementById('finStartDate').value = '';
+  document.getElementById('finEndDate').value = '';
+  document.getElementById('finTypeFilter').value = 'ALL';
+  document.getElementById('finPaymentFilter').value = 'ALL';
+  document.getElementById('finSearchInput').value = '';
+  document.getElementById('finTableCatFilter').value = 'ALL';
+  applyFinanceFilters();
+}
+
+function setFinanceTrendGranularity(granularity) {
+  APP_STATE.finance.trendGranularity = granularity;
+  const btnDaily = document.getElementById('finTrendModeDaily');
+  const btnMonthly = document.getElementById('finTrendModeMonthly');
+  if (granularity === 'daily') {
+    btnDaily.className = 'px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs cursor-pointer';
+    btnMonthly.className = 'px-2.5 py-1 rounded-md text-slate-600 dark:text-slate-400 cursor-pointer';
+  } else {
+    btnMonthly.className = 'px-2.5 py-1 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 shadow-2xs cursor-pointer';
+    btnDaily.className = 'px-2.5 py-1 rounded-md text-slate-600 dark:text-slate-400 cursor-pointer';
+  }
+  renderFinanceTrendChart();
+}
+
+function applyFinanceFilters() {
+  if (!APP_STATE.data) return;
+  const period = document.getElementById('finPeriodFilter').value;
+  const startDate = document.getElementById('finStartDate').value;
+  const endDate = document.getElementById('finEndDate').value;
+  const txType = document.getElementById('finTypeFilter').value;
+  const payMethod = document.getElementById('finPaymentFilter').value;
+
+  APP_STATE.finance.period = period;
+  APP_STATE.finance.startDate = startDate;
+  APP_STATE.finance.endDate = endDate;
+  APP_STATE.finance.type = txType;
+  APP_STATE.finance.payMethod = payMethod;
+
+  const allTx = APP_STATE.data.finance.transactions || [];
+  const filtered = allTx.filter(function(tx) {
+    if (period !== 'ALL' && tx.period !== period && tx.date.slice(0, 7) !== period) return false;
+    if (startDate && tx.date < startDate) return false;
+    if (endDate && tx.date > endDate) return false;
+    if (txType !== 'ALL' && tx.type !== txType) return false;
+    if (payMethod !== 'ALL' && tx.payMethod !== payMethod) return false;
+    return true;
+  });
+
+  APP_STATE.finance.filteredTransactions = filtered;
+
+  let income = 0, incomeCount = 0;
+  let expense = 0, expenseCount = 0;
+  let invest = 0, investCount = 0;
+
+  filtered.forEach(function(tx) {
+    if (tx.type === 'Income') {
+      income += tx.amount;
+      incomeCount++;
+    } else if (tx.type === 'Expense') {
+      expense += tx.amount;
+      expenseCount++;
+      if (tx.mainCat === 'Investment Transfer') {
+        invest += tx.amount;
+        investCount++;
+      }
+    } else if (tx.type === 'Transfer') {
+      invest += tx.amount;
+      investCount++;
+    }
+  });
+
+  const net = income - expense;
+  const budgetTarget = 10000;
+  const budgetLeft = budgetTarget - expense;
+  const budgetPct = (expense / budgetTarget) * 100;
+
+  setText('finKpiIncome', formatTHB(income, 0));
+  setText('finKpiIncomeSub', incomeCount + ' รายการรับเงิน');
+  setText('finKpiExpense', formatTHB(expense, 0));
+  setText('finKpiExpenseSub', expenseCount + ' รายการจ่าย');
+
+  const netEl = document.getElementById('finKpiNet');
+  netEl.textContent = (net >= 0 ? '+' : '-') + formatTHB(Math.abs(net), 0);
+  netEl.className = 'text-xl sm:text-2xl font-semibold tabular-nums mt-2 ' +
+    (net >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400');
+  setText('finKpiNetSub', net >= 0 ? 'กระแสเงินสดสุทธิเป็นบวก' : 'รายจ่ายสูงกว่ารายรับ');
+
+  const remEl = document.getElementById('finKpiBudgetRemaining');
+  remEl.textContent = (budgetLeft >= 0 ? '' : '-') + formatTHB(Math.abs(budgetLeft), 0);
+  remEl.className = 'text-xl sm:text-2xl font-semibold tabular-nums mt-2 ' +
+    (budgetPct <= 80 ? 'text-slate-900 dark:text-slate-100' : (budgetPct <= 100 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'));
+
+  const bBadge = document.getElementById('finKpiBudgetBadge');
+  const bBar = document.getElementById('finKpiBudgetBar');
+  bBadge.textContent = formatNum(budgetPct, 1) + '%';
+  bBar.style.width = Math.min(100, Math.max(0, budgetPct)) + '%';
+  if (budgetPct <= 80) {
+    bBar.className = 'h-full bg-slate-900 dark:bg-slate-200 rounded-full transition-all duration-300';
+    bBadge.className = getSemanticBadgeClass_('positive');
+  } else if (budgetPct <= 100) {
+    bBar.className = 'h-full bg-amber-500 rounded-full transition-all duration-300';
+    bBadge.className = getSemanticBadgeClass_('warning');
+  } else {
+    bBar.className = 'h-full bg-rose-600 rounded-full transition-all duration-300';
+    bBadge.className = getSemanticBadgeClass_('negative');
+  }
+
+  setText('finKpiInvest', formatTHB(invest, 0));
+  setText('finKpiInvestSub', investCount + ' รายการลงทุน/โอน');
+
+  if (APP_STATE.mode === 'finance') {
+    renderFinanceCharts();
+  }
+  renderFinanceSubCategoryDrilldown();
+  renderFinanceTable();
+}
+
+function renderFinanceCharts() {
+  renderFinanceTrendChart();
+  renderFinanceCategoryChart();
+  renderFinancePaymentChart();
+}
+
+function renderFinanceTrendChart() {
+  const ctx = document.getElementById('finTrendChart');
+  if (!ctx) return;
+
+  const txs = APP_STATE.finance.filteredTransactions || [];
+  const granularity = APP_STATE.finance.trendGranularity || 'daily';
+  const bucketMap = {};
+
+  txs.forEach(function(tx) {
+    const key = granularity === 'monthly' ? (tx.period || tx.date.slice(0, 7)) : tx.date;
+    if (!bucketMap[key]) {
+      bucketMap[key] = { income: 0, expense: 0, transfer: 0 };
+    }
+    if (tx.type === 'Income') {
+      bucketMap[key].income += tx.amount;
+    } else if (tx.type === 'Expense') {
+      bucketMap[key].expense += tx.amount;
+      if (tx.mainCat === 'Investment Transfer') {
+        bucketMap[key].transfer += tx.amount;
+      }
+    } else if (tx.type === 'Transfer') {
+      bucketMap[key].transfer += tx.amount;
+    }
+  });
+
+  const keys = Object.keys(bucketMap).sort();
+  const labels = keys.map(function(k) { return granularity === 'daily' ? k.slice(5) : k; });
+  const incomeSeries = keys.map(function(k) { return bucketMap[k].income; });
+  const expenseSeries = keys.map(function(k) { return bucketMap[k].expense; });
+  const transferSeries = keys.map(function(k) { return bucketMap[k].transfer; });
+
+  const colors = getChartThemeColors();
+  if (CHARTS.finTrend) CHARTS.finTrend.destroy();
+
+  CHARTS.finTrend = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'รายรับ (Income)',
+          data: incomeSeries,
+          backgroundColor: colors.positive,
+          borderRadius: 4,
+          maxBarThickness: 24
+        },
+        {
+          label: 'รายจ่าย (Expense)',
+          data: expenseSeries,
+          backgroundColor: colors.primaryBar,
+          borderRadius: 4,
+          maxBarThickness: 24
+        },
+        {
+          type: 'line',
+          label: 'เงินลงทุน (Investment)',
+          data: transferSeries,
+          borderColor: colors.accentBlue,
+          backgroundColor: colors.accentBlue,
+          borderWidth: 2,
+          pointRadius: 3,
+          tension: 0.25
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: colors.text, font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: { ticks: { color: colors.muted, font: { size: 11 } }, grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Replaces banned >4 category Donut Chart with a Horizontal Bar Chart (sorted descending).
+ * Clicking any bar drills down into Sub_Category.
+ */
+function renderFinanceCategoryChart() {
+  const ctx = document.getElementById('finCategoryChart');
+  if (!ctx) return;
+
+  const txs = APP_STATE.finance.filteredTransactions || [];
+  const catTotals = {};
+  txs.forEach(function(tx) {
+    if (tx.type === 'Expense' || tx.type === 'Transfer') {
+      catTotals[tx.mainCat] = (catTotals[tx.mainCat] || 0) + tx.amount;
+    }
+  });
+
+  const sortedCats = Object.keys(catTotals).sort(function(a, b) { return catTotals[b] - catTotals[a]; });
+  if (sortedCats.length > 0 && sortedCats.indexOf(APP_STATE.finance.selectedMainCat) === -1) {
+    APP_STATE.finance.selectedMainCat = sortedCats[0];
+  }
+
+  const values = sortedCats.map(function(c) { return Math.round(catTotals[c] * 100) / 100; });
+  const colors = getChartThemeColors();
+  const barColors = sortedCats.map(function(c) {
+    return c === APP_STATE.finance.selectedMainCat ? colors.primaryBar : colors.secondaryBar;
+  });
+
+  if (CHARTS.finCategory) CHARTS.finCategory.destroy();
+
+  CHARTS.finCategory = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sortedCats,
+      datasets: [{
+        label: 'ยอดใช้จ่าย (THB)',
+        data: values,
+        backgroundColor: barColors,
+        borderRadius: 4,
+        maxBarThickness: 18
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      onClick: function(evt, elements) {
+        if (elements && elements.length > 0) {
+          const idx = elements[0].index;
+          const clickedCat = sortedCats[idx];
+          if (clickedCat) {
+            selectSubCategoryDrilldown(clickedCat);
+          }
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        },
+        y: {
+          ticks: { color: colors.text, font: { size: 11 } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+}
+
+function selectSubCategoryDrilldown(mainCat) {
+  APP_STATE.finance.selectedMainCat = mainCat;
+  renderFinanceCategoryChart();
+  renderFinanceSubCategoryDrilldown();
+}
+
+function renderFinanceSubCategoryDrilldown() {
+  const txs = APP_STATE.finance.filteredTransactions || [];
+  const catTotals = {};
+  const subCatMap = {};
+
+  txs.forEach(function(tx) {
+    if (tx.type === 'Expense' || tx.type === 'Transfer') {
+      catTotals[tx.mainCat] = (catTotals[tx.mainCat] || 0) + tx.amount;
+      if (!subCatMap[tx.mainCat]) subCatMap[tx.mainCat] = {};
+      const sub = tx.subCat || 'ทั่วไป';
+      if (!subCatMap[tx.mainCat][sub]) subCatMap[tx.mainCat][sub] = { amount: 0, count: 0 };
+      subCatMap[tx.mainCat][sub].amount += tx.amount;
+      subCatMap[tx.mainCat][sub].count++;
+    }
+  });
+
+  const sortedCats = Object.keys(catTotals).sort(function(a, b) { return catTotals[b] - catTotals[a]; });
+  const activeCat = APP_STATE.finance.selectedMainCat;
+
+  const pillsEl = document.getElementById('finCategoryPills');
+  if (pillsEl) {
+    pillsEl.innerHTML = sortedCats.map(function(cat) {
+      const isSelected = cat === activeCat;
+      const cls = isSelected
+        ? 'bg-slate-900 text-white border-slate-900 dark:bg-slate-100 dark:text-slate-900 dark:border-slate-100'
+        : 'bg-slate-50 dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-400';
+      return '<button type="button" data-cat="' + escapeHtml_(cat) + '" onclick="selectSubCategoryDrilldown(this.getAttribute(\'data-cat\'))" ' +
+        'class="px-2.5 py-1 rounded-md text-xs font-medium border whitespace-nowrap transition cursor-pointer ' + cls + '">' +
+        escapeHtml_(cat) + '</button>';
+    }).join('');
+  }
+
+  setText('subCatDrillTitle', 'หมวดย่อยของ: ' + (activeCat || '-'));
+  const totalForCat = catTotals[activeCat] || 0;
+  setText('subCatDrillTotal', 'รวม ' + formatTHB(totalForCat, 0));
+
+  const subListEl = document.getElementById('finSubCategoryList');
+  if (!subListEl) return;
+
+  const subs = subCatMap[activeCat] || {};
+  const sortedSubs = Object.keys(subs).sort(function(a, b) { return subs[b].amount - subs[a].amount; });
+
+  if (sortedSubs.length === 0) {
+    subListEl.innerHTML = '<p class="text-xs text-slate-500 py-2">ไม่มีข้อมูลหมวดย่อยในช่วงที่เลือก</p>';
+    return;
+  }
+
+  subListEl.innerHTML = sortedSubs.map(function(subName) {
+    const item = subs[subName];
+    const pct = totalForCat > 0 ? (item.amount / totalForCat) * 100 : 0;
+    return '<div class="text-xs">' +
+      '<div class="flex justify-between items-center mb-1">' +
+        '<span class="font-medium text-slate-700 dark:text-slate-200">' + escapeHtml_(subName) +
+          ' <span class="text-xs text-slate-500 tabular-nums">(' + item.count + ')</span></span>' +
+        '<span class="font-medium tabular-nums text-slate-900 dark:text-slate-100">' + formatTHB(item.amount, 0) + ' <span class="text-slate-500">(' + formatNum(pct, 0) + '%)</span></span>' +
+      '</div>' +
+      '<div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">' +
+        '<div class="h-full bg-slate-900 dark:bg-slate-300 rounded-full" style="width:' + Math.min(100, pct) + '%"></div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderFinancePaymentChart() {
+  const ctx = document.getElementById('finPaymentChart');
+  if (!ctx) return;
+
+  const txs = APP_STATE.finance.filteredTransactions || [];
+  const payTotals = {};
+  const payCounts = {};
+  let grandTotal = 0;
+
+  txs.forEach(function(tx) {
+    if (tx.type === 'Expense' || tx.type === 'Transfer') {
+      const pm = tx.payMethod || 'Unknown';
+      payTotals[pm] = (payTotals[pm] || 0) + tx.amount;
+      payCounts[pm] = (payCounts[pm] || 0) + 1;
+      grandTotal += tx.amount;
+    }
+  });
+
+  const sortedMethods = Object.keys(payTotals).sort(function(a, b) { return payTotals[b] - payTotals[a]; });
+  const amounts = sortedMethods.map(function(m) { return Math.round(payTotals[m] * 100) / 100; });
+  const colors = getChartThemeColors();
+
+  if (CHARTS.finPayment) CHARTS.finPayment.destroy();
+
+  CHARTS.finPayment = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sortedMethods,
+      datasets: [{
+        label: 'ยอดใช้จ่าย (THB)',
+        data: amounts,
+        backgroundColor: colors.primaryBar,
+        borderRadius: 4,
+        maxBarThickness: 18
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        },
+        y: {
+          ticks: { color: colors.text, font: { size: 11 } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  const listEl = document.getElementById('finPaymentList');
+  if (listEl) {
+    listEl.innerHTML = sortedMethods.map(function(pm) {
+      const amt = payTotals[pm];
+      const pct = grandTotal > 0 ? (amt / grandTotal) * 100 : 0;
+      return '<div class="flex items-center justify-between text-xs py-1.5 border-b border-slate-100 dark:border-slate-800/70">' +
+        '<span class="font-medium text-slate-700 dark:text-slate-300">' + escapeHtml_(pm) + ' <span class="text-slate-500 tabular-nums">(' + payCounts[pm] + ')</span></span>' +
+        '<span class="font-medium tabular-nums text-slate-900 dark:text-slate-100">' + formatTHB(amt, 0) + ' <span class="text-slate-500">(' + formatNum(pct, 1) + '%)</span></span>' +
+      '</div>';
+    }).join('');
+  }
+}
+
+function renderSubscriptionTrackerWidget(subscriptions, activeBurn) {
+  setText('subWidgetTotalBurn', formatTHB(activeBurn, 2));
+  const activeSubs = subscriptions.filter(function(s) { return s.status === 'Active'; });
+  setText('subWidgetCountBadge', activeSubs.length + ' Active');
+
+  const container = document.getElementById('subscriptionListContainer');
+  if (!container) return;
+
+  if (subscriptions.length === 0) {
+    container.innerHTML = '<p class="text-xs text-slate-500 col-span-2 py-4 text-center">ไม่พบรายการใน Subscription_Master</p>';
+    return;
+  }
+
+  container.innerHTML = subscriptions.map(function(sub) {
+    const isActive = sub.status === 'Active';
+    const isDueSoon = sub.isDueSoon;
+    let badgeHtml = '';
+    if (!isActive) {
+      badgeHtml = '<span class="' + getSemanticBadgeClass_('neutral') + '">' + escapeHtml_(sub.status) + '</span>';
+    } else if (sub.daysUntilBilling === 0) {
+      badgeHtml = '<span class="' + getSemanticBadgeClass_('negative') + '">ตัดรอบวันนี้</span>';
+    } else if (isDueSoon) {
+      badgeHtml = '<span class="' + getSemanticBadgeClass_('warning') + '">อีก ' + sub.daysUntilBilling + ' วัน (วันที่ ' + sub.billingDay + ')</span>';
+    } else if (sub.billingDay) {
+      badgeHtml = '<span class="' + getSemanticBadgeClass_('neutral') + '">ทุกวันที่ ' + sub.billingDay + '</span>';
+    }
+
+    const borderCls = isDueSoon
+      ? 'border-amber-300 bg-amber-50/30 dark:border-amber-800/70 dark:bg-amber-950/20'
+      : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50';
+
+    return '<div class="p-3.5 rounded-xl border ' + borderCls + ' flex flex-col justify-between">' +
+      '<div class="flex items-start justify-between gap-2">' +
+        '<div>' +
+          '<h4 class="text-xs font-semibold text-slate-900 dark:text-slate-100">' + escapeHtml_(sub.serviceName) + '</h4>' +
+          '<p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">' +
+            escapeHtml_(sub.platform || sub.category) + ' • ' + escapeHtml_(sub.payMethod) +
+          '</p>' +
+        '</div>' +
+        badgeHtml +
+      '</div>' +
+      '<div class="mt-3 pt-2 border-t border-slate-200/70 dark:border-slate-800 flex items-baseline justify-between">' +
+        '<span class="text-xs text-slate-500 font-mono">' + escapeHtml_(sub.cycle) + '</span>' +
+        '<span class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">' + formatTHB(sub.amountTHBEst, 2) + '</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderFinanceTable() {
+  const tbody = document.getElementById('finTransactionsTbody');
+  if (!tbody) return;
+
+  const query = (document.getElementById('finSearchInput').value || '').trim().toLowerCase();
+  const catFilter = document.getElementById('finTableCatFilter').value;
+
+  const rows = (APP_STATE.finance.filteredTransactions || []).filter(function(tx) {
+    if (catFilter !== 'ALL' && tx.mainCat !== catFilter) return false;
+    if (query) {
+      const hay = [tx.desc, tx.subCat, tx.mainCat, tx.payMethod, tx.date].join(' ').toLowerCase();
+      if (hay.indexOf(query) === -1) return false;
+    }
+    return true;
+  });
+
+  setText('finTxTableCountText', 'แสดง ' + Math.min(rows.length, 150) + ' จากทั้งหมด ' + rows.length + ' รายการ');
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center">' +
+      '<div class="space-y-2">' +
+        '<p class="text-xs text-slate-500 dark:text-slate-400">ไม่พบรายการธุรกรรมที่ตรงกับตัวกรอง</p>' +
+        '<button type="button" onclick="resetFinanceFilters()" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition cursor-pointer">ล้างตัวกรอง (Reset filters)</button>' +
+      '</div>' +
+    '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.slice(0, 150).map(function(tx) {
+    let typeBadge = '';
+    let amtColor = '';
+    let sign = '';
+    if (tx.type === 'Income') {
+      typeBadge = '<span class="' + getSemanticBadgeClass_('positive') + '">Income</span>';
+      amtColor = 'text-emerald-700 dark:text-emerald-400';
+      sign = '+';
+    } else if (tx.type === 'Transfer') {
+      typeBadge = '<span class="' + getSemanticBadgeClass_('neutral') + '">Transfer</span>';
+      amtColor = 'text-slate-900 dark:text-slate-100';
+      sign = '';
+    } else {
+      typeBadge = '<span class="' + getSemanticBadgeClass_('negative') + '">Expense</span>';
+      amtColor = 'text-rose-600 dark:text-rose-400';
+      sign = '-';
+    }
+
+    return '<tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">' +
+      '<td class="py-2.5 px-4 whitespace-nowrap font-mono tabular-nums text-xs text-slate-600 dark:text-slate-300">' +
+        escapeHtml_(tx.date) + (tx.time ? ' <span class="text-slate-400">' + escapeHtml_(tx.time) + '</span>' : '') +
+      '</td>' +
+      '<td class="py-2.5 px-4">' + typeBadge + '</td>' +
+      '<td class="py-2.5 px-4 font-medium text-slate-900 dark:text-slate-100">' + escapeHtml_(tx.mainCat) + '</td>' +
+      '<td class="py-2.5 px-4 text-slate-600 dark:text-slate-400">' + escapeHtml_(tx.subCat || '-') + '</td>' +
+      '<td class="py-2.5 px-4 max-w-xs truncate text-slate-700 dark:text-slate-300" title="' + escapeHtml_(tx.desc) + '">' + escapeHtml_(tx.desc || '-') + '</td>' +
+      '<td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300">' + escapeHtml_(tx.payMethod) + '</span></td>' +
+      '<td class="py-2.5 px-4 text-right font-semibold tabular-nums ' + amtColor + '">' + sign + formatTHB(tx.amount, 2) + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+/* ==========================================================================
+ * 5. VIEW 3: NUTRITION & BODY DASHBOARD CONTROLLER
+ * ========================================================================== */
+
+function initNutritionControls() {
+  const nut = APP_STATE.data.nutrition;
+  const dates = nut.availableDates || [];
+  const latestDate = nut.latestDate || APP_STATE.data.meta.today;
+
+  const singleSelect = document.getElementById('nutSingleDateSelect');
+  singleSelect.innerHTML = dates.map(function(d) {
+    return '<option value="' + d + '">' + d + '</option>';
+  }).join('');
+
+  APP_STATE.nutrition.singleDate = latestDate;
+  if (dates.length > 0) {
+    singleSelect.value = latestDate;
+  }
+
+  setNutritionRangePreset('7d');
+}
+
+function setNutritionRangePreset(preset) {
+  APP_STATE.nutrition.preset = preset;
+  const presets = ['daily', '7d', '30d', 'all'];
+  presets.forEach(function(p) {
+    const btn = document.getElementById('nutPreset-' + p);
+    if (!btn) return;
+    if (p === preset) {
+      btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900';
+    } else {
+      btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200/70';
+    }
+  });
+
+  const dates = (APP_STATE.data && APP_STATE.data.nutrition.availableDates) || [];
+  const latest = dates[0] || APP_STATE.data.meta.today;
+
+  const singleWrap = document.getElementById('nutSingleDateWrapper');
+  if (preset === 'daily') {
+    singleWrap.classList.remove('hidden');
+    const selDate = document.getElementById('nutSingleDateSelect').value || latest;
+    APP_STATE.nutrition.startDate = selDate;
+    APP_STATE.nutrition.endDate = selDate;
+  } else {
+    singleWrap.classList.add('hidden');
+    if (preset === '7d') {
+      const targetDates = dates.slice(0, 7);
+      APP_STATE.nutrition.endDate = targetDates[0] || latest;
+      APP_STATE.nutrition.startDate = targetDates[targetDates.length - 1] || latest;
+    } else if (preset === '30d') {
+      const targetDates = dates.slice(0, 30);
+      APP_STATE.nutrition.endDate = targetDates[0] || latest;
+      APP_STATE.nutrition.startDate = targetDates[targetDates.length - 1] || latest;
+    } else {
+      APP_STATE.nutrition.endDate = dates[0] || latest;
+      APP_STATE.nutrition.startDate = dates[dates.length - 1] || latest;
+    }
+  }
+
+  document.getElementById('nutStartDate').value = APP_STATE.nutrition.startDate;
+  document.getElementById('nutEndDate').value = APP_STATE.nutrition.endDate;
+  applyNutritionFilters();
+}
+
+function onNutritionSingleDateChange() {
+  const sel = document.getElementById('nutSingleDateSelect').value;
+  APP_STATE.nutrition.singleDate = sel;
+  APP_STATE.nutrition.startDate = sel;
+  APP_STATE.nutrition.endDate = sel;
+  document.getElementById('nutStartDate').value = sel;
+  document.getElementById('nutEndDate').value = sel;
+  applyNutritionFilters();
+}
+
+function setNutritionCustomDates() {
+  APP_STATE.nutrition.preset = 'custom';
+  APP_STATE.nutrition.startDate = document.getElementById('nutStartDate').value;
+  APP_STATE.nutrition.endDate = document.getElementById('nutEndDate').value;
+  ['daily', '7d', '30d', 'all'].forEach(function(p) {
+    const btn = document.getElementById('nutPreset-' + p);
+    if (btn) {
+      btn.className = 'px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300';
+    }
+  });
+  applyNutritionFilters();
+}
+
+function resetNutritionTableFilters() {
+  document.getElementById('nutSearchInput').value = '';
+  document.getElementById('nutMealTypeFilter').value = 'ALL';
+  document.getElementById('nutFlagFilter').value = 'ALL';
+  document.getElementById('nutConfidenceFilter').value = 'ALL';
+  renderNutritionMealTable();
+}
+
+function applyNutritionFilters() {
+  if (!APP_STATE.data) return;
+  const start = APP_STATE.nutrition.startDate;
+  const end = APP_STATE.nutrition.endDate;
+
+  const allDays = APP_STATE.data.nutrition.dailySummaries || [];
+  const allMeals = APP_STATE.data.nutrition.meals || [];
+
+  const filteredDays = allDays.filter(function(d) {
+    if (start && d.date < start) return false;
+    if (end && d.date > end) return false;
+    return true;
+  });
+
+  const filteredMeals = allMeals.filter(function(m) {
+    if (start && m.date < start) return false;
+    if (end && m.date > end) return false;
+    return true;
+  });
+
+  APP_STATE.nutrition.filteredDays = filteredDays;
+  APP_STATE.nutrition.filteredMeals = filteredMeals;
+
+  const mealDays = filteredDays.filter(function(d) { return d.mealCount > 0; });
+  const divisor = Math.max(mealDays.length, 1);
+
+  let sumProtein = 0, sumCalLow = 0, sumCalHigh = 0, sumCalMid = 0, sumCarbs = 0, sumVeg = 0;
+  let proteinHitDays = 0, vegHitDays = 0, warningMealsTotal = 0;
+  const flagsCount = {
+    'fried food': 0,
+    'sugary drink': 0,
+    'highly processed food': 0,
+    'dessert / high added sugar': 0
+  };
+
+  mealDays.forEach(function(d) {
+    sumProtein += d.proteinG;
+    sumCalLow += d.calLow;
+    sumCalHigh += d.calHigh;
+    sumCalMid += d.calMid;
+    sumCarbs += d.carbsG;
+    sumVeg += d.vegFruit;
+    if (d.proteinG >= 115) proteinHitDays++;
+    if (d.vegFruit >= 3.0) vegHitDays++;
+    warningMealsTotal += d.warningMealCount;
+
+    Object.keys(flagsCount).forEach(function(k) {
+      flagsCount[k] += (d.flagsBreakdown && d.flagsBreakdown[k]) || 0;
+    });
+  });
+
+  const avgProtein = sumProtein / divisor;
+  const avgCalLow = sumCalLow / divisor;
+  const avgCalHigh = sumCalHigh / divisor;
+  const avgCalMid = sumCalMid / divisor;
+  const avgCarbs = sumCarbs / divisor;
+  const avgVeg = sumVeg / divisor;
+  const isSingleDay = APP_STATE.nutrition.preset === 'daily' || mealDays.length <= 1;
+
+  // Target 1: Protein
+  setText('nutGaugeProteinVal', formatNum(avgProtein, 1) + ' g');
+  setText('nutGaugeProteinSubLabel', isSingleDay ? '/ 115 g' : '/ 115 g (เฉลี่ย)');
+  setText(
+    'nutGaugeProteinHitRate',
+    'ถึงเป้า: ' + proteinHitDays + '/' + mealDays.length + ' วัน (' +
+    formatNum(mealDays.length > 0 ? (proteinHitDays / mealDays.length) * 100 : 0, 0) + '%)'
+  );
+  const pBadge = document.getElementById('nutGaugeProteinBadge');
+  const pBar = document.getElementById('nutGaugeProteinBar');
+  pBar.style.width = Math.min(100, (avgProtein / 115) * 100) + '%';
+  applyProteinBadgeStyle_(pBadge, pBar, avgProtein);
+
+  // Target 2: Calorie Range Band
+  setText('nutGaugeCalMid', formatNum(avgCalMid, 0));
+  setText('nutGaugeCalRangeText', 'ช่วง Low–High: ' + formatNum(avgCalLow, 0) + ' – ' + formatNum(avgCalHigh, 0) + ' kcal');
+  setText('nutGaugeCarbsText', 'Carbs: ' + formatNum(avgCarbs, 0) + ' g');
+  const calBadge = document.getElementById('nutGaugeCalBadge');
+  const calBar = document.getElementById('nutGaugeCalBar');
+  calBar.style.width = Math.min(100, (avgCalMid / 2100) * 100) + '%';
+  applyCalorieBadgeStyle_(calBadge, calBar, avgCalMid);
+
+  // Target 3: Veg & Fruit
+  setText('nutGaugeVegVal', formatNum(avgVeg, 1));
+  setText('nutGaugeVegHitDays', 'ถึงเป้า: ' + vegHitDays + '/' + mealDays.length + ' วัน');
+  const vegBadge = document.getElementById('nutGaugeVegBadge');
+  const vegBar = document.getElementById('nutGaugeVegBar');
+  vegBar.style.width = Math.min(100, (avgVeg / 3.0) * 100) + '%';
+  if (avgVeg >= 3.0) {
+    vegBadge.textContent = 'ผ่านเกณฑ์ (>= 3.0)';
+    vegBadge.className = getSemanticBadgeClass_('positive');
+    vegBar.className = 'h-full bg-emerald-600 rounded-full transition-all duration-300';
+  } else {
+    vegBadge.textContent = 'ต่ำกว่าเป้า (< 3.0)';
+    vegBadge.className = getSemanticBadgeClass_('negative');
+    vegBar.className = 'h-full bg-rose-600 rounded-full transition-all duration-300';
+  }
+
+  // Target 4: Health Flags Counter
+  const flagBadge = document.getElementById('nutGaugeFlagTotalBadge');
+  if (flagBadge) {
+    flagBadge.textContent = warningMealsTotal + ' มื้อที่มี Flag';
+    flagBadge.className = getSemanticBadgeClass_(warningMealsTotal === 0 ? 'positive' : 'warning');
+  }
+  setText('flagCountFried', String(flagsCount['fried food']));
+  setText('flagCountSugary', String(flagsCount['sugary drink']));
+  setText('flagCountProcessed', String(flagsCount['highly processed food']));
+  setText('flagCountDessert', String(flagsCount['dessert / high added sugar']));
+
+  if (APP_STATE.mode === 'nutrition') {
+    renderNutritionCharts();
+  }
+  renderNutritionMealTable();
+}
+
+function renderNutritionCharts() {
+  const daysChrono = (APP_STATE.nutrition.filteredDays || []).slice().reverse();
+  renderNutCalorieBandChart(daysChrono);
+  renderNutMacrosChart(daysChrono);
+  renderNutMealTypeChart(APP_STATE.nutrition.filteredMeals || []);
+  renderNutBodyWorkoutChart();
+}
+
+function renderNutCalorieBandChart(daysChrono) {
+  const ctx = document.getElementById('nutCalorieBandChart');
+  if (!ctx) return;
+
+  const activeDays = daysChrono.filter(function(d) { return d.mealCount > 0; });
+  const labels = activeDays.map(function(d) { return d.date.slice(5); });
+  const lowData = activeDays.map(function(d) { return d.calLow; });
+  const highData = activeDays.map(function(d) { return d.calHigh; });
+  const midData = activeDays.map(function(d) { return d.calMid; });
+  const targetLowLine = activeDays.map(function() { return 1800; });
+  const targetHighLine = activeDays.map(function() { return 2100; });
+
+  const colors = getChartThemeColors();
+  if (CHARTS.nutCalorieBand) CHARTS.nutCalorieBand.destroy();
+
+  CHARTS.nutCalorieBand = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: 'Calorie_High',
+          data: highData,
+          borderColor: 'rgba(100, 116, 139, 0.30)',
+          backgroundColor: 'rgba(100, 116, 139, 0.12)',
+          borderWidth: 1,
+          pointRadius: 2,
+          fill: '+1',
+          tension: 0.25
+        },
+        {
+          label: 'Calorie_Low',
+          data: lowData,
+          borderColor: 'rgba(100, 116, 139, 0.30)',
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          pointRadius: 2,
+          fill: false,
+          tension: 0.25
+        },
+        {
+          label: 'Calorie_Mid (ค่ากลาง)',
+          data: midData,
+          borderColor: colors.primaryBar,
+          backgroundColor: colors.primaryBar,
+          borderWidth: 2,
+          pointRadius: 3.5,
+          tension: 0.25
+        },
+        {
+          label: 'เกณฑ์ต่ำสุด (1,800)',
+          data: targetLowLine,
+          borderColor: colors.positive,
+          borderDash: [5, 4],
+          borderWidth: 1.25,
+          pointRadius: 0
+        },
+        {
+          label: 'เกณฑ์สูงสุด (2,100)',
+          data: targetHighLine,
+          borderColor: colors.negative,
+          borderDash: [5, 4],
+          borderWidth: 1.25,
+          pointRadius: 0
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: colors.text, font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: { ticks: { color: colors.muted, font: { size: 11 } }, grid: { display: false } },
+        y: {
+          beginAtZero: false,
+          suggestedMin: 1000,
+          suggestedMax: 2500,
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        }
+      }
+    }
+  });
+}
+
+function renderNutMacrosChart(daysChrono) {
+  const ctx = document.getElementById('nutMacrosChart');
+  if (!ctx) return;
+
+  const activeDays = daysChrono.filter(function(d) { return d.mealCount > 0; });
+  const labels = activeDays.map(function(d) { return d.date.slice(5); });
+  const proteinData = activeDays.map(function(d) { return d.proteinG; });
+  const carbsData = activeDays.map(function(d) { return d.carbsG; });
+  const target115 = activeDays.map(function() { return 115; });
+
+  const colors = getChartThemeColors();
+  const proteinColors = activeDays.map(function(d) {
+    if (d.proteinG >= 115) return colors.positive;
+    if (d.proteinG >= 85) return colors.warning;
+    return colors.negative;
+  });
+
+  if (CHARTS.nutMacros) CHARTS.nutMacros.destroy();
+
+  CHARTS.nutMacros = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: 'line',
+          label: 'เป้าหมายโปรตีน (115g)',
+          data: target115,
+          borderColor: colors.positive,
+          borderDash: [5, 4],
+          borderWidth: 1.5,
+          pointRadius: 0,
+          order: 0
+        },
+        {
+          type: 'bar',
+          label: 'Protein (g)',
+          data: proteinData,
+          backgroundColor: proteinColors,
+          borderRadius: 4,
+          maxBarThickness: 22,
+          order: 1
+        },
+        {
+          type: 'bar',
+          label: 'Carbs (g)',
+          data: carbsData,
+          backgroundColor: colors.secondaryBar,
+          borderRadius: 4,
+          maxBarThickness: 22,
+          order: 2
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: colors.text, font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: { ticks: { color: colors.muted, font: { size: 11 } }, grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Replaces banned >4 category Donut Chart with a clean Horizontal Bar Chart (sorted descending).
+ */
+function renderNutMealTypeChart(meals) {
+  const ctx = document.getElementById('nutMealTypeChart');
+  if (!ctx) return;
+
+  const map = {};
+  let totalCal = 0;
+  meals.forEach(function(m) {
+    if (!map[m.mealType]) map[m.mealType] = { calMid: 0, proteinG: 0, count: 0 };
+    map[m.mealType].calMid += m.calMid;
+    map[m.mealType].proteinG += m.proteinG;
+    map[m.mealType].count++;
+    totalCal += m.calMid;
+  });
+
+  const sortedTypes = Object.keys(map).sort(function(a, b) { return map[b].calMid - map[a].calMid; });
+  const calValues = sortedTypes.map(function(t) { return Math.round(map[t].calMid); });
+  const colors = getChartThemeColors();
+
+  if (CHARTS.nutMealType) CHARTS.nutMealType.destroy();
+
+  CHARTS.nutMealType = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sortedTypes,
+      datasets: [{
+        label: 'พลังงานรวม (kcal)',
+        data: calValues,
+        backgroundColor: colors.primaryBar,
+        borderRadius: 4,
+        maxBarThickness: 18
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        },
+        y: {
+          ticks: { color: colors.text, font: { size: 11 } },
+          grid: { display: false }
+        }
+      }
+    }
+  });
+
+  const legendEl = document.getElementById('nutMealTypeLegend');
+  if (legendEl) {
+    legendEl.innerHTML = sortedTypes.map(function(t) {
+      const item = map[t];
+      const pct = totalCal > 0 ? (item.calMid / totalCal) * 100 : 0;
+      return '<div class="flex items-center justify-between py-1.5 border-b border-slate-100 dark:border-slate-800/70">' +
+        '<span class="font-medium text-slate-700 dark:text-slate-300">' + escapeHtml_(t) + ' <span class="text-slate-500 tabular-nums">(' + item.count + ' มื้อ)</span></span>' +
+        '<span class="tabular-nums font-medium text-slate-900 dark:text-slate-100">' + formatNum(item.calMid, 0) + ' kcal • ' +
+          '<span class="text-emerald-700 dark:text-emerald-400">' + formatNum(item.proteinG, 1) + 'g P</span> <span class="text-slate-500">(' + formatNum(pct, 0) + '%)</span></span>' +
+      '</div>';
+    }).join('');
+  }
+}
+
+function renderNutBodyWorkoutChart() {
+  const ctx = document.getElementById('nutBodyWorkoutChart');
+  if (!ctx || !APP_STATE.data) return;
+
+  const allDaysChrono = (APP_STATE.data.nutrition.dailySummaries || []).slice().reverse();
+  const bodyDays = allDaysChrono.filter(function(d) {
+    return d.weightKg !== null || d.waistCm !== null || d.workoutBurnKcal > 0;
+  });
+
+  const targetSeries = bodyDays.length > 0 ? bodyDays : allDaysChrono.slice(-14);
+  const labels = targetSeries.map(function(d) { return d.date.slice(5); });
+  const weightData = targetSeries.map(function(d) { return d.weightKg; });
+  const waistData = targetSeries.map(function(d) { return d.waistCm; });
+  const burnData = targetSeries.map(function(d) { return d.workoutBurnKcal; });
+
+  let latestWeight = null, latestWaist = null;
+  for (let i = targetSeries.length - 1; i >= 0; i--) {
+    if (latestWeight === null && targetSeries[i].weightKg !== null) latestWeight = targetSeries[i].weightKg;
+    if (latestWaist === null && targetSeries[i].waistCm !== null) latestWaist = targetSeries[i].waistCm;
+  }
+  setText('latestWeightLabel', latestWeight !== null ? formatNum(latestWeight, 1) + ' kg' : '- kg');
+  setText('latestWaistLabel', latestWaist !== null ? formatNum(latestWaist, 1) + ' cm' : '- cm');
+
+  const colors = getChartThemeColors();
+  if (CHARTS.nutBodyWorkout) CHARTS.nutBodyWorkout.destroy();
+
+  CHARTS.nutBodyWorkout = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          type: 'line',
+          label: 'Weight (kg)',
+          data: weightData,
+          borderColor: colors.primaryBar,
+          backgroundColor: colors.primaryBar,
+          borderWidth: 2,
+          pointRadius: 3.5,
+          spanGaps: true,
+          yAxisID: 'yBody'
+        },
+        {
+          type: 'line',
+          label: 'Waist (cm)',
+          data: waistData,
+          borderColor: colors.accentBlue,
+          backgroundColor: colors.accentBlue,
+          borderWidth: 2,
+          pointRadius: 3,
+          spanGaps: true,
+          yAxisID: 'yBody'
+        },
+        {
+          type: 'bar',
+          label: 'Workout Burn (kcal)',
+          data: burnData,
+          backgroundColor: colors.secondaryBar,
+          borderRadius: 4,
+          maxBarThickness: 22,
+          yAxisID: 'yBurn'
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: colors.text, font: { size: 11 }, boxWidth: 12 } },
+        tooltip: {
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipText,
+          bodyColor: colors.tooltipText,
+          borderColor: colors.tooltipBorder,
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: { ticks: { color: colors.muted, font: { size: 11 } }, grid: { display: false } },
+        yBody: {
+          type: 'linear',
+          position: 'left',
+          title: { display: true, text: 'kg / cm', color: colors.muted, font: { size: 11 } },
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { color: colors.grid }
+        },
+        yBurn: {
+          type: 'linear',
+          position: 'right',
+          beginAtZero: true,
+          title: { display: true, text: 'Burn (kcal)', color: colors.muted, font: { size: 11 } },
+          ticks: { color: colors.muted, font: { size: 11 } },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+}
+
+function renderNutritionMealTable() {
+  const tbody = document.getElementById('nutMealsTbody');
+  if (!tbody) return;
+
+  const query = (document.getElementById('nutSearchInput').value || '').trim().toLowerCase();
+  const mealTypeFilter = document.getElementById('nutMealTypeFilter').value;
+  const flagFilter = document.getElementById('nutFlagFilter').value;
+  const confFilter = document.getElementById('nutConfidenceFilter').value;
+
+  const rows = (APP_STATE.nutrition.filteredMeals || []).filter(function(m) {
+    if (mealTypeFilter !== 'ALL' && m.mealType !== mealTypeFilter) return false;
+    if (confFilter !== 'ALL' && m.confidence !== confFilter) return false;
+    if (flagFilter === 'CLEAN' && m.flags.length > 0) return false;
+    if (flagFilter === 'ANY_FLAG' && m.flags.length === 0) return false;
+    if (flagFilter !== 'ALL' && flagFilter !== 'CLEAN' && flagFilter !== 'ANY_FLAG') {
+      if (m.flags.indexOf(flagFilter) === -1) return false;
+    }
+    if (query) {
+      const hay = [m.foodItems, m.mealType, m.portion, m.date, m.flags.join(' ')].join(' ').toLowerCase();
+      if (hay.indexOf(query) === -1) return false;
+    }
+    return true;
+  });
+
+  setText('nutMealTableCountText', 'แสดง ' + Math.min(rows.length, 150) + ' จากทั้งหมด ' + rows.length + ' มื้ออาหาร (Deduplicated)');
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" class="py-10 text-center">' +
+      '<div class="space-y-2">' +
+        '<p class="text-xs text-slate-500 dark:text-slate-400">ไม่พบรายการอาหารที่ตรงกับตัวกรอง</p>' +
+        '<button type="button" onclick="resetNutritionTableFilters()" class="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 transition cursor-pointer">ล้างตัวกรอง (Reset filters)</button>' +
+      '</div>' +
+    '</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.slice(0, 150).map(function(m) {
+    const flagsHtml = m.flags.length === 0
+      ? '<span class="' + getSemanticBadgeClass_('positive') + '">Clean</span>'
+      : m.flags.map(function(f) {
+          return '<span class="inline-block mr-1 mb-1 ' + getSemanticBadgeClass_('warning') + '">' + escapeHtml_(f) + '</span>';
+        }).join('');
+
+    let confBadge = '<span class="' + getSemanticBadgeClass_('neutral') + '">Medium</span>';
+    if (m.confidence === 'High') {
+      confBadge = '<span class="' + getSemanticBadgeClass_('positive') + '">High</span>';
+    } else if (m.confidence === 'Low') {
+      confBadge = '<span class="' + getSemanticBadgeClass_('warning') + '">Low</span>';
+    }
+
+    return '<tr class="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">' +
+      '<td class="py-2.5 px-4 whitespace-nowrap font-mono tabular-nums text-xs text-slate-600 dark:text-slate-300">' + escapeHtml_(m.date) + '</td>' +
+      '<td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700 font-medium text-xs text-slate-700 dark:text-slate-300">' + escapeHtml_(m.mealType) + '</span></td>' +
+      '<td class="py-2.5 px-4 font-medium text-slate-900 dark:text-slate-100 max-w-xs">' + escapeHtml_(m.foodItems) + '</td>' +
+      '<td class="py-2.5 px-4 text-slate-600 dark:text-slate-400">' + escapeHtml_(m.portion || '-') + '</td>' +
+      '<td class="py-2.5 px-4 text-right tabular-nums">' +
+        '<span class="text-slate-500 text-xs">' + formatNum(m.calLow, 0) + '–' + formatNum(m.calHigh, 0) + '</span> ' +
+        '<strong class="text-slate-900 dark:text-slate-100 font-semibold ml-1">(' + formatNum(m.calMid, 0) + ')</strong>' +
+      '</td>' +
+      '<td class="py-2.5 px-4 text-right tabular-nums font-semibold text-emerald-700 dark:text-emerald-400">' + formatNum(m.proteinG, 1) + '</td>' +
+      '<td class="py-2.5 px-4 text-right tabular-nums text-slate-700 dark:text-slate-300">' + formatNum(m.carbsG, 1) + '</td>' +
+      '<td class="py-2.5 px-4 text-right tabular-nums text-slate-700 dark:text-slate-300">' + formatNum(m.vegFruit, 1) + '</td>' +
+      '<td class="py-2.5 px-4">' + flagsHtml + '</td>' +
+      '<td class="py-2.5 px-4 text-center" title="' + escapeHtml_(m.uncertainty || '') + '">' + confBadge + '</td>' +
+    '</tr>';
+  }).join('');
+}
+
+/* ==========================================================================
+ * 6. UI BADGE, FORMATTING & ESCAPE HELPERS (ZERO EMOJIS)
+ * ========================================================================== */
+
+function getSemanticBadgeClass_(variant) {
+  if (variant === 'positive') {
+    return 'px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/70 tabular-nums';
+  }
+  if (variant === 'warning') {
+    return 'px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/70 tabular-nums';
+  }
+  if (variant === 'negative') {
+    return 'px-2 py-0.5 rounded-md text-xs font-medium bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/70 tabular-nums';
+  }
+  return 'px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 tabular-nums';
+}
+
+function applyProteinBadgeStyle_(badgeEl, barEl, proteinG) {
+  if (!badgeEl || !barEl) return;
+  if (proteinG >= 115) {
+    badgeEl.textContent = 'ผ่านเป้า (>= 115g)';
+    badgeEl.className = getSemanticBadgeClass_('positive');
+    barEl.className = 'h-full bg-emerald-600 rounded-full transition-all duration-300';
+  } else if (proteinG >= 85) {
+    badgeEl.textContent = 'ใกล้เป้า (85–114g)';
+    badgeEl.className = getSemanticBadgeClass_('warning');
+    barEl.className = 'h-full bg-amber-500 rounded-full transition-all duration-300';
+  } else {
+    badgeEl.textContent = 'ต่ำกว่าเกณฑ์ (< 85g)';
+    badgeEl.className = getSemanticBadgeClass_('negative');
+    barEl.className = 'h-full bg-rose-600 rounded-full transition-all duration-300';
+  }
+}
+
+function applyCalorieBadgeStyle_(badgeEl, barEl, calMid) {
+  if (!badgeEl || !barEl) return;
+  if (calMid >= 1800 && calMid <= 2100) {
+    badgeEl.textContent = 'Optimal (1,800–2,100)';
+    badgeEl.className = getSemanticBadgeClass_('positive');
+    barEl.className = 'h-full bg-emerald-600 rounded-full transition-all duration-300';
+  } else if (calMid < 1800) {
+    badgeEl.textContent = 'ต่ำกว่ากรอบ (< 1,800)';
+    badgeEl.className = getSemanticBadgeClass_('neutral');
+    barEl.className = 'h-full bg-blue-600 rounded-full transition-all duration-300';
+  } else {
+    badgeEl.textContent = 'เกินกรอบ (> 2,100)';
+    badgeEl.className = getSemanticBadgeClass_('warning');
+    barEl.className = 'h-full bg-amber-500 rounded-full transition-all duration-300';
+  }
+}
+
+function setText(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
+function formatTHB(val, decimals) {
+  const num = Number(val) || 0;
+  const d = decimals !== undefined ? decimals : 0;
+  return '฿' + num.toLocaleString('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+function formatNum(val, decimals) {
+  const num = Number(val) || 0;
+  const d = decimals !== undefined ? decimals : 0;
+  return num.toLocaleString('th-TH', { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+
+function escapeHtml_(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function setSyncSpinner(active) {
+  const dIcon = document.getElementById('desktopSyncIcon');
+  const mIcon = document.getElementById('mobileSyncIcon');
+  if (dIcon) dIcon.classList.toggle('animate-spin', active);
+  if (mIcon) mIcon.classList.toggle('animate-spin', active);
+}
+
+function showErrorState(msg) {
+  const banner = document.getElementById('errorStateBanner');
+  const msgEl = document.getElementById('errorStateMessage');
+  if (banner && msgEl) {
+    msgEl.textContent = msg;
+    banner.classList.remove('hidden');
+  }
+}
+
+function hideErrorState() {
+  const banner = document.getElementById('errorStateBanner');
+  if (banner) banner.classList.add('hidden');
+}
+
+let toastTimer = null;
+function showToast(title, message, isError) {
+  const banner = document.getElementById('toastBanner');
+  if (!banner) return;
+  setText('toastTitle', title);
+  setText('toastMessage', message);
+  banner.className = 'fixed bottom-5 right-5 z-50 max-w-sm saas-card p-4 border-l-4 ' +
+    (isError ? 'border-l-rose-600' : 'border-l-slate-900 dark:border-l-slate-200');
+  banner.classList.remove('hidden');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(hideToast, 4500);
+}
+
+function hideToast() {
+  const banner = document.getElementById('toastBanner');
+  if (banner) banner.classList.add('hidden');
+}
+
+/* ==========================================================================
+ * 6B. iOS SCRIPTABLE MEDIUM WIDGET (4x2) PREVIEW & GENERATOR
+ * ========================================================================== */
+
+function openWidgetModal() {
+  const modal = document.getElementById('iosWidgetModal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeWidgetModal() {
+  const modal = document.getElementById('iosWidgetModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function copyScriptableWidgetCode() {
+  const code = getScriptableWidgetSourceCode_();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(function() {
+      showToast('คัดลอกโค้ดสำเร็จ', 'นำไปวางในแอป Scriptable บน iPhone เพื่อสร้าง Medium Widget ได้ทันที');
+    }).catch(function() {
+      fallbackCopyText_(code);
+    });
+  } else {
+    fallbackCopyText_(code);
+  }
+}
+
+function fallbackCopyText_(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  document.body.appendChild(ta);
+  ta.select();
+  try {
+    document.execCommand('copy');
+    showToast('คัดลอกโค้ดสำเร็จ', 'นำไปวางในแอป Scriptable บน iPhone ได้ทันที');
+  } catch (e) {
+    showToast('ไม่สามารถคัดลอกอัตโนมัติได้', 'กรุณาคลุมดำโค้ดในกล่องด้านล่างแล้วกด Copy', true);
+  }
+  document.body.removeChild(ta);
+}
+
+function updateWidgetPreview_(activeMonth, monthSum, latestDay) {
+  const d = APP_STATE.data;
+  if (!d) return;
+
+  const targetDate = latestDay.date || d.meta.today;
+  let todaySpent = 0;
+  (d.finance.transactions || []).forEach(function(tx) {
+    if (tx.type === 'Expense' && tx.date === targetDate) {
+      todaySpent += Number(tx.amount) || 0;
+    }
+  });
+
+  setText('wprevBudgetLeft', formatTHB(monthSum.budgetRemaining, 0));
+  const usedPct = Math.max(0, Number(monthSum.budgetUsedPct) || 0);
+  setText('wprevBudgetSub', 'ใช้ไป ' + formatNum(usedPct, 1) + '% ของงบ ฿10k (' + activeMonth + ')');
+  const wBudgetBar = document.getElementById('wprevBudgetBar');
+  if (wBudgetBar) {
+    wBudgetBar.style.width = Math.min(100, usedPct) + '%';
+    wBudgetBar.className = 'h-full rounded-full ' + (usedPct > 100 ? 'bg-rose-500' : (usedPct > 80 ? 'bg-amber-400' : 'bg-emerald-400'));
+  }
+
+  setText('wprevProteinVal', formatNum(latestDay.proteinG, 1));
+  const wProtBar = document.getElementById('wprevProteinBar');
+  if (wProtBar) {
+    wProtBar.style.width = Math.min(100, (latestDay.proteinG / 115) * 100) + '%';
+    wProtBar.className = 'h-full rounded-full ' + (latestDay.proteinG >= 115 ? 'bg-emerald-400' : (latestDay.proteinG >= 85 ? 'bg-amber-400' : 'bg-rose-500'));
+  }
+
+  setText('wprevCalVal', formatNum(latestDay.calMid, 0));
+  const calBadge = document.getElementById('wprevCalBadge');
+  if (calBadge) {
+    if (latestDay.calMid >= 1800 && latestDay.calMid <= 2100) {
+      calBadge.textContent = 'OPTIMAL';
+      calBadge.className = 'text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium';
+    } else if (latestDay.calMid < 1800) {
+      calBadge.textContent = 'LOW';
+      calBadge.className = 'text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-medium';
+    } else {
+      calBadge.textContent = 'HIGH';
+      calBadge.className = 'text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium';
+    }
+  }
+  setText('wprevCalRange', 'กรอบ ' + formatNum(latestDay.calLow, 0) + '–' + formatNum(latestDay.calHigh, 0) + ' kcal');
+
+  setText('wprevTodaySpend', formatTHB(todaySpent, 0));
+  setText('wprevMonthSpend', 'สะสมเดือนนี้ ' + formatTHB(monthSum.expense, 0) + ' (' + activeMonth + ')');
+  setText('wprevUpdatedText', (d.meta.generatedAt || 'Live').slice(11, 16) || 'Live');
+}
+
+function getScriptableWidgetSourceCode_() {
+  const endpointUrl = 'https://script.google.com/macros/s/AKfycbyq6FrcVrN1AxhWMaO8i7oFwmXIBiTrod55lCYvQrESfim4YIzHN0OJywO1rzvAKHCuQA/exec';
+  return [
+    '// Variables used by Scriptable.',
+    '// icon-color: deep-gray; icon-glyph: chart-bar;',
+    '// Daily Life Dashboard — iOS Medium Widget (4x2)',
+    'const WEBAPP_URL = "' + endpointUrl + '";',
+    'const API_URL = WEBAPP_URL + "?mode=widget_json";',
+    '',
+    'async function loadMetrics() {',
+    '  try {',
+    '    const req = new Request(API_URL);',
+    '    req.timeoutInterval = 15;',
+    '    return await req.loadJSON();',
+    '  } catch (e) {',
+    '    return null;',
+    '  }',
+    '}',
+    '',
+    'function fmtTHB(n) {',
+    '  return "฿" + Number(n || 0).toLocaleString("en-US", { maximumFractionDigits: 0 });',
+    '}',
+    '',
+    'function addCard(parent, title, mainVal, subText, accentHex) {',
+    '  const card = parent.addStack();',
+    '  card.layoutVertically();',
+    '  card.backgroundColor = new Color("#262320");',
+    '  card.cornerRadius = 10;',
+    '  card.setPadding(8, 10, 8, 10);',
+    '  card.borderColor = new Color("#3A3530");',
+    '  card.borderWidth = 1;',
+    '',
+    '  const t = card.addText(title.toUpperCase());',
+    '  t.font = Font.semiboldSystemFont(9);',
+    '  t.textColor = new Color("#A8A29E");',
+    '  card.addSpacer(3);',
+    '',
+    '  const v = card.addText(mainVal);',
+    '  v.font = Font.boldMonospacedSystemFont(15);',
+    '  v.textColor = new Color(accentHex || "#FAF9F6");',
+    '  card.addSpacer(2);',
+    '',
+    '  const s = card.addText(subText);',
+    '  s.font = Font.systemFont(9);',
+    '  s.textColor = new Color("#78716C");',
+    '  s.lineLimit = 1;',
+    '}',
+    '',
+    'const data = await loadMetrics();',
+    'const w = new ListWidget();',
+    'w.backgroundColor = new Color("#1C1917");',
+    'w.setPadding(12, 14, 12, 14);',
+    'w.url = WEBAPP_URL;',
+    '',
+    'const header = w.addStack();',
+    'header.centerAlignContent();',
+    'const title = header.addText("DAILY LIFE VAULT");',
+    'title.font = Font.boldSystemFont(10);',
+    'title.textColor = new Color("#D6D3CD");',
+    'header.addSpacer();',
+    'const meta = header.addText(data && data.activeMonth ? data.activeMonth : "OFFLINE");',
+    'meta.font = Font.mediumMonospacedSystemFont(9);',
+    'meta.textColor = new Color("#10B981");',
+    'w.addSpacer(8);',
+    '',
+    'if (data && data.metrics) {',
+    '  const m = data.metrics;',
+    '  const row1 = w.addStack();',
+    '  row1.spacing = 8;',
+    '  const bPct = Number(m.budget.usedPct || 0).toFixed(1);',
+    '  addCard(row1, "1. งบคงเหลือเดือนนี้", fmtTHB(m.budget.remainingTHB), "ใช้ไป " + bPct + "% ของงบ ฿10k", m.budget.remainingTHB >= 2000 ? "#FAF9F6" : "#F59E0B");',
+    '  const pColor = m.protein.currentG >= 115 ? "#34D399" : (m.protein.currentG >= 85 ? "#FBBF24" : "#FB7185");',
+    '  addCard(row1, "2. โปรตีนวันนี้", m.protein.currentG.toFixed(1) + " / 115g", "วันที่ " + m.protein.date, pColor);',
+    '',
+    '  w.addSpacer(8);',
+    '  const row2 = w.addStack();',
+    '  row2.spacing = 8;',
+    '  addCard(row2, "3. แคลอรีวันนี้ (MID)", m.calories.mid + " kcal", "กรอบ " + m.calories.low + "–" + m.calories.high + " kcal", "#FAF9F6");',
+    '  addCard(row2, "4. รายจ่ายวันนี้ / เดือนนี้", fmtTHB(m.spend.todayTHB), "เดือนนี้ " + fmtTHB(m.spend.monthTHB), "#FAF9F6");',
+    '} else {',
+    '  const err = w.addText("ไม่สามารถดึงข้อมูลได้ แตะเพื่อเปิด Web App");',
+    '  err.font = Font.systemFont(11);',
+    '  err.textColor = new Color("#F87171");',
+    '}',
+    '',
+    'if (config.runsInWidget) {',
+    '  Script.setWidget(w);',
+    '} else {',
+    '  await w.presentMedium();',
+    '}',
+    'Script.complete();'
+  ].join('\n');
+}
+
+/* ==========================================================================
+ * 7. LOCAL PREVIEW DATASET (Used only when opened outside Apps Script)
+ * ========================================================================== */
+function buildLocalPreviewDataset_() {
+  const today = '2026-10-17';
+  const month = '2026-10';
+  return {
+    success: true,
+    meta: {
+      generatedAt: '2026-10-17 12:30:00',
+      timezone: 'Asia/Bangkok',
+      today: today,
+      currentMonth: month,
+      fromCache: false,
+      latestFinanceDate: today,
+      latestFinanceMonth: month,
+      latestFoodDate: today,
+      stats: {
+        outcomeRawRows: 42,
+        outcomeParsedRows: 42,
+        outcomeShiftedRowsRecovered: 5,
+        incomeRawRows: 4,
+        incomeParsedRows: 4,
+        subscriptionRows: 4,
+        foodRawRows: 28,
+        foodUniqueRows: 25,
+        foodDuplicatesRemoved: 3,
+        bodyWorkoutRows: 7
+      }
+    },
+    targets: {
+      monthlyBudgetTHB: 10000,
+      proteinG: 115,
+      proteinWarnG: 85,
+      calorieLow: 1800,
+      calorieHigh: 2100,
+      vegFruitPortions: 3.0
+    },
+    finance: {
+      activeSubscriptionBurn: 858,
+      dueSoonCount: 2,
+      availableMonths: ['2026-10', '2026-09'],
+      availableCategories: [
+        'Food & Drink', 'Transport', 'Shopping & Personal', 'Housing & Bills',
+        'Health & Wellness', 'Work & Education', 'Entertainment', 'Investment Transfer', 'Other Expense'
+      ],
+      availablePaymentMethods: [
+        'SCB', 'KBank', 'KTB', 'BBL', 'TTB', 'เป๋าตัง (G-Wallet)', 'Credit Card', 'Cash', 'PromptPay', 'Unknown'
+      ],
+      subscriptions: [
+        { id: 'SUB-2', serviceName: 'YouTube Premium', platform: 'Google', category: 'Entertainment', cycle: 'Monthly', billingDay: 19, amount: 179, currency: 'THB', amountTHBEst: 179, payMethod: 'KBank', status: 'Active', daysUntilBilling: 2, isDueSoon: true },
+        { id: 'SUB-3', serviceName: 'ChatGPT Plus', platform: 'OpenAI', category: 'Work & Education', cycle: 'Monthly', billingDay: 22, amount: 20, currency: 'USD', amountTHBEst: 679, payMethod: 'Credit Card', status: 'Active', daysUntilBilling: 5, isDueSoon: true }
+      ],
+      transactions: [
+        { id: 'OUT-10', date: '2026-10-17', period: '2026-10', time: '12:15', type: 'Expense', amount: 145, mainCat: 'Food & Drink', subCat: 'อาหารมื้อหลัก', desc: 'อกไก่ย่าง + ข้าวกล้อง + ไข่ต้ม', payMethod: 'SCB' },
+        { id: 'OUT-9', date: '2026-10-17', period: '2026-10', time: '08:30', type: 'Expense', amount: 45, mainCat: 'Transport', subCat: 'รถไฟฟ้า', desc: 'BTS ไปที่ทำงาน', payMethod: 'เป๋าตัง (G-Wallet)' },
+        { id: 'OUT-8', date: '2026-10-16', period: '2026-10', time: '18:20', type: 'Expense', amount: 180, mainCat: 'Food & Drink', subCat: 'อาหารมื้อหลัก', desc: 'สเต็กปลาแซลมอน + สลัดผัก', payMethod: 'KBank' },
+        { id: 'OUT-7', date: '2026-10-16', period: '2026-10', time: '08:10', type: 'Expense', amount: 30, mainCat: 'Transport', subCat: 'วินมอเตอร์ไซค์', desc: 'วินปากซอย', payMethod: 'Cash' },
+        { id: 'OUT-6', date: '2026-10-15', period: '2026-10', time: '20:00', type: 'Transfer', amount: 2500, mainCat: 'Investment Transfer', subCat: 'DCA กองทุน', desc: 'ออมหุ้นรายเดือน', payMethod: 'SCB' },
+        { id: 'INC-2', date: '2026-10-01', period: '2026-10', time: '09:00', type: 'Income', amount: 18500, mainCat: 'Income', subCat: 'เบี้ยเลี้ยงฝึกงาน', desc: 'เบี้ยเลี้ยงประจำเดือน ต.ค.', payMethod: 'SCB' }
+      ],
+      monthlySummaries: {
+        '2026-10': {
+          period: '2026-10', income: 18500, expense: 4820, investmentTransfer: 2500,
+          netCashflow: 13680, budgetRemaining: 5180, budgetUsedPct: 48.2,
+          activeSubscriptionBurn: 858, foodExpense: 2890,
+          byCategory: { 'Food & Drink': { count: 18, amount: 2890 }, 'Transport': { count: 12, amount: 840 } },
+          bySubCategory: {}, byPaymentMethod: {}
+        },
+        'ALL': {
+          period: 'ALL', income: 18500, expense: 4820, investmentTransfer: 2500,
+          netCashflow: 13680, budgetRemaining: 5180, budgetUsedPct: 48.2,
+          activeSubscriptionBurn: 858, foodExpense: 2890,
+          byCategory: {}, bySubCategory: {}, byPaymentMethod: {}
+        }
+      }
+    },
+    nutrition: {
+      latestDate: today,
+      availableDates: ['2026-10-17', '2026-10-16', '2026-10-15'],
+      dailySummaries: [
+        {
+          date: '2026-10-17', mealCount: 3, calLow: 1820, calHigh: 2040, calMid: 1930,
+          proteinG: 122.5, carbsG: 195, vegFruit: 3.5, warningMealCount: 0,
+          flagsBreakdown: { 'sugary drink': 0, 'fried food': 0, 'highly processed food': 0, 'dessert / high added sugar': 0 },
+          proteinStatus: 'green', proteinBadge: '>= 115g', calorieStatus: 'optimal', vegStatus: 'green',
+          weightKg: 68.4, waistCm: 76.5, workoutDurationMin: 45, workoutBurnKcal: 340
+        },
+        {
+          date: '2026-10-16', mealCount: 3, calLow: 1750, calHigh: 1980, calMid: 1865,
+          proteinG: 108.0, carbsG: 210, vegFruit: 2.5, warningMealCount: 1,
+          flagsBreakdown: { 'sugary drink': 0, 'fried food': 1, 'highly processed food': 0, 'dessert / high added sugar': 0 },
+          proteinStatus: 'yellow', proteinBadge: '85-114g', calorieStatus: 'optimal', vegStatus: 'red',
+          weightKg: 68.6, waistCm: 76.8, workoutDurationMin: 30, workoutBurnKcal: 220
+        },
+        {
+          date: '2026-10-15', mealCount: 3, calLow: 1900, calHigh: 2150, calMid: 2025,
+          proteinG: 118.0, carbsG: 205, vegFruit: 3.0, warningMealCount: 0,
+          flagsBreakdown: { 'sugary drink': 0, 'fried food': 0, 'highly processed food': 0, 'dessert / high added sugar': 0 },
+          proteinStatus: 'green', proteinBadge: '>= 115g', calorieStatus: 'optimal', vegStatus: 'green',
+          weightKg: 68.7, waistCm: 77.0, workoutDurationMin: 50, workoutBurnKcal: 390
+        }
+      ],
+      meals: [
+        { id: 'FOOD-1', date: '2026-10-17', mealType: 'Breakfast', foodItems: 'โจ๊กหมูสับไข่ลวก 2 ฟอง + เวย์โปรตีน 1 สกู๊ป', portion: '1 ชาม + 1 แก้ว', calLow: 520, calHigh: 580, calMid: 550, proteinG: 46, carbsG: 55, vegFruit: 0.5, flags: [], confidence: 'High', uncertainty: '' },
+        { id: 'FOOD-2', date: '2026-10-17', mealType: 'Lunch', foodItems: 'ข้าวกล้องอกไก่ย่างน้ำจิ้มแจ่ว + ผักลวก', portion: '1 จาน', calLow: 620, calHigh: 700, calMid: 660, proteinG: 44.5, carbsG: 72, vegFruit: 1.5, flags: [], confidence: 'High', uncertainty: '' },
+        { id: 'FOOD-3', date: '2026-10-17', mealType: 'Dinner', foodItems: 'สลัดทูน่าไข่ต้ม + มันหวานญี่ปุ่น', portion: '1 ชามใหญ่', calLow: 680, calHigh: 760, calMid: 720, proteinG: 32, carbsG: 68, vegFruit: 1.5, flags: [], confidence: 'Medium', uncertainty: 'ปริมาณน้ำสลัด' }
+      ],
+      bodyWorkouts: []
+    },
+    crossInsights: {
+      activeMonth: '2026-10',
+      totalFoodSpendTHB: 2890,
+      avgDailyFoodSpendTHB: 180.6,
+      avgSpendPerMealTHB: 60.2,
+      totalProteinG: 348.5,
+      thbPerGramProtein: 1.42,
+      kcalPerTHB: 11.4,
+      overlapDaysCount: 3,
+      foodSpendDaysCount: 16,
+      nutritionDaysCount: 16,
+      dailyCorrelation: [
+        { date: '2026-10-15', foodSpendTHB: 165, proteinG: 118.0, calMid: 2025 },
+        { date: '2026-10-16', foodSpendTHB: 180, proteinG: 108.0, calMid: 1865 },
+        { date: '2026-10-17', foodSpendTHB: 145, proteinG: 122.5, calMid: 1930 }
+      ]
+    }
+  };
+}
+</script>

@@ -1,0 +1,8 @@
+# Google Apps Script local project credentials & private utility scripts
+.clasp.json
+scripts/
+
+# OS & Node
+node_modules/
+.DS_Store
+Thumbs.db
