@@ -319,6 +319,15 @@
             </span>
             <span id="sidebarNutBadge" class="sidebar-badge text-xs font-mono tabular-nums text-emerald-700 dark:text-emerald-400">0g</span>
           </button>
+
+          <button id="nav-gym" onclick="focusGymWidget()" title="Gym & Recovery"
+            class="sidebar-nav-item w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-xs cursor-pointer">
+            <span class="flex items-center gap-2.5 truncate">
+              <i data-lucide="dumbbell" class="w-4 h-4 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
+              <span class="sidebar-label truncate">Gym &amp; Recovery</span>
+            </span>
+            <span id="sidebarGymBadge" class="sidebar-badge text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400">A/B</span>
+          </button>
         </div>
 
         <!-- Section 2: Future Expansion Slots (Scalable Multi-Dashboard Architecture) -->
@@ -327,15 +336,6 @@
             <span>Future Modules</span>
             <span class="font-mono text-xs">Slots</span>
           </div>
-
-          <button onclick="showFutureModuleToast('Workout & Cardio Tracker')" title="Workout & Cardio (Slot)"
-            class="sidebar-nav-item w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs opacity-75 cursor-pointer">
-            <span class="flex items-center gap-2.5 truncate">
-              <i data-lucide="heart-pulse" class="w-4 h-4 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
-              <span class="sidebar-label truncate">Workout &amp; Cardio</span>
-            </span>
-            <span class="sidebar-badge px-1.5 py-0.5 rounded text-xs font-mono bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Slot</span>
-          </button>
 
           <button onclick="showFutureModuleToast('Habit & Sleep Matrix')" title="Habit & Sleep (Slot)"
             class="sidebar-nav-item w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs opacity-75 cursor-pointer">
@@ -587,8 +587,11 @@
                   <span id="ovBudgetBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 tabular-nums">On Track</span>
                 </div>
                 <div class="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span id="ovBudgetSpent" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">฿0</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ ฿10,000</span>
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="ovBudgetSpent" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">฿0</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ ฿10,000</span>
+                  </div>
+                  <div id="ovBudgetSparkline" class="shrink-0" title="แนวโน้มรายจ่ายสะสมเดือนนี้"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -613,8 +616,11 @@
                   <span id="ovProteinBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">&lt; 85g</span>
                 </div>
                 <div class="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span id="ovProteinVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 g</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">เป้า 115 g</span>
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="ovProteinVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 g</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">เป้า 115 g</span>
+                  </div>
+                  <div id="ovProteinSparkline" class="shrink-0" title="แนวโน้มโปรตีนย้อนหลัง 14 วัน"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -639,8 +645,11 @@
                   <span id="ovCalorieBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">-</span>
                 </div>
                 <div class="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span id="ovCalorieMidVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 kcal</span>
-                  <span id="ovCalorieBandSub" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">(0–0)</span>
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="ovCalorieMidVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 kcal</span>
+                    <span id="ovCalorieBandSub" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">(0–0)</span>
+                  </div>
+                  <div id="ovCalorieSparkline" class="shrink-0" title="แนวโน้มพลังงานแคลอรี่ย้อนหลัง 14 วัน"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -664,8 +673,9 @@
                   </span>
                   <span id="ovSubDueBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 tabular-nums">0 Due</span>
                 </div>
-                <div class="mt-2.5 flex items-baseline gap-1.5">
+                <div class="mt-2.5 flex items-baseline justify-between gap-2">
                   <span id="ovNetCashflowVal" class="text-2xl font-semibold tracking-tight tabular-nums">฿0</span>
+                  <div id="ovNetCashflowSparkline" class="shrink-0" title="แนวโน้มกระแสเงินสดสุทธิรายวัน"></div>
                 </div>
               </div>
               <div class="mt-4 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center text-xs tabular-nums">
@@ -674,6 +684,85 @@
               </div>
             </div>
 
+          </div>
+
+          <!-- Gym & Recovery Widget (read-only summary of the standalone Gym Tracker) -->
+          <div id="gymWidget" class="saas-card p-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
+              <div class="flex items-center gap-2">
+                <i data-lucide="dumbbell" class="w-4 h-4 text-slate-500 dark:text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
+                <h2 class="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">Gym &amp; Recovery</h2>
+                <span id="gymStatusBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">-</span>
+              </div>
+              <div class="grid grid-cols-1 sm:flex items-center gap-2">
+                <a id="gymExpressBtn" target="_blank" rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:focus-visible:outline-slate-200">
+                  <i data-lucide="timer" class="w-3.5 h-3.5 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
+                  <span>30-Min Express Mode</span>
+                </a>
+                <a id="gymLaunchBtn" target="_blank" rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-lg text-xs font-semibold bg-stone-900 hover:bg-stone-800 text-white dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:focus-visible:outline-slate-200">
+                  <span>Launch Gym Tracker</span>
+                  <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
+                </a>
+              </div>
+            </div>
+
+            <div id="gymUnavailable" class="hidden mt-4 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 leading-relaxed"></div>
+
+            <div id="gymBody" class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
+              <!-- Next routine & readiness -->
+              <div class="lg:col-span-5 space-y-3">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">ครั้งถัดไป</span>
+                <div class="flex items-center gap-3">
+                  <span id="gymNextWorkout" class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">-</span>
+                  <span class="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden text-xs font-mono" aria-hidden="true">
+                    <span id="gymSegA" class="px-2 py-0.5">A</span>
+                    <span id="gymSegB" class="px-2 py-0.5 border-l border-slate-200 dark:border-slate-700">B</span>
+                  </span>
+                </div>
+                <p id="gymStreakText" class="text-xs text-slate-600 dark:text-slate-400 tabular-nums">-</p>
+                <p id="gymInsightText" class="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">-</p>
+              </div>
+
+              <!-- Fuel check -->
+              <div class="lg:col-span-4 space-y-4 lg:border-l lg:pl-6 border-slate-200 dark:border-slate-800">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">อาหารวันนี้</span>
+                <div>
+                  <div class="flex items-baseline justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-400">โปรตีน</span>
+                    <span id="gymFuelProtein" class="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0 / 115 g</span>
+                  </div>
+                  <div class="mt-1.5 w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div id="gymFuelProteinBar" class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex items-baseline justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-400">พลังงาน (Mid)</span>
+                    <span id="gymFuelCal" class="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0 kcal</span>
+                  </div>
+                  <div class="mt-1.5 w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div id="gymFuelCalBar" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                  <p id="gymFuelCalSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 tabular-nums">เป้า 1,800–2,100 kcal</p>
+                </div>
+              </div>
+
+              <!-- Last session & body -->
+              <dl class="lg:col-span-3 space-y-3 text-xs lg:border-l lg:pl-6 border-slate-200 dark:border-slate-800">
+                <div>
+                  <dt class="text-slate-500 dark:text-slate-400">ครั้งล่าสุด</dt>
+                  <dd id="gymLastSession" class="mt-0.5 font-medium text-slate-900 dark:text-slate-100 tabular-nums">-</dd>
+                  <dd id="gymLastSessionSub" class="text-slate-500 dark:text-slate-400 tabular-nums">-</dd>
+                </div>
+                <div>
+                  <dt class="text-slate-500 dark:text-slate-400">น้ำหนักตัวล่าสุด</dt>
+                  <dd id="gymBodyWeight" class="mt-0.5 font-medium text-slate-900 dark:text-slate-100 tabular-nums">-</dd>
+                  <dd id="gymBodySub" class="text-slate-500 dark:text-slate-400 tabular-nums">-</dd>
+                </div>
+              </dl>
+            </div>
           </div>
 
           <!-- Domain Quick-Switch Cards -->
@@ -695,9 +784,12 @@
                     วิเคราะห์กระแสเงินสด งบ ฿10,000/เดือน เจาะลึกหมวดหมู่ย่อย และแจ้งเตือนรอบตัดบัตร
                   </p>
                 </div>
-                <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
-                  <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
-                </span>
+                <div class="flex items-center gap-2.5">
+                  <div id="ovCardFinSparkline" class="shrink-0" title="แนวโน้มรายจ่าย 14 วันล่าสุด"></div>
+                  <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
+                  </span>
+                </div>
               </div>
               <div class="mt-4 pt-3 border-t border-slate-200/80 dark:border-slate-800 grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -732,9 +824,12 @@
                     ติดตามโปรตีน ช่วงแคลอรี 1,800–2,100 kcal ผักผลไม้ 3 ส่วน และแนวโน้มน้ำหนัก/ออกกำลังกาย
                   </p>
                 </div>
-                <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
-                  <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
-                </span>
+                <div class="flex items-center gap-2.5">
+                  <div id="ovCardNutSparkline" class="shrink-0" title="แนวโน้มโปรตีน 14 วันล่าสุด"></div>
+                  <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
+                  </span>
+                </div>
               </div>
               <div class="mt-4 pt-3 border-t border-slate-200/80 dark:border-slate-800 grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -902,8 +997,13 @@
                 <span>รายรับรวม</span>
                 <i data-lucide="trending-up" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiIncome" class="text-xl sm:text-2xl font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums mt-2">฿0</p>
-              <p id="finKpiIncomeSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiIncome" class="text-xl sm:text-2xl font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">฿0</p>
+                  <p id="finKpiIncomeSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+                </div>
+                <div id="finIncomeSparkline" class="shrink-0" title="แนวโน้มรายรับ"></div>
+              </div>
             </div>
 
             <div class="saas-card p-4">
@@ -911,8 +1011,13 @@
                 <span>รายจ่ายรวม</span>
                 <i data-lucide="trending-down" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiExpense" class="text-xl sm:text-2xl font-semibold text-rose-600 dark:text-rose-400 tabular-nums mt-2">฿0</p>
-              <p id="finKpiExpenseSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiExpense" class="text-xl sm:text-2xl font-semibold text-rose-600 dark:text-rose-400 tabular-nums">฿0</p>
+                  <p id="finKpiExpenseSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+                </div>
+                <div id="finExpenseSparkline" class="shrink-0" title="แนวโน้มรายจ่าย"></div>
+              </div>
             </div>
 
             <div class="saas-card p-4">
@@ -920,8 +1025,13 @@
                 <span>กระแสเงินสดสุทธิ</span>
                 <i data-lucide="scale" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiNet" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums mt-2">฿0</p>
-              <p id="finKpiNetSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Income - Expense</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiNet" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">฿0</p>
+                  <p id="finKpiNetSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Income - Expense</p>
+                </div>
+                <div id="finNetSparkline" class="shrink-0" title="แนวโน้มกระแสเงินสดสุทธิ"></div>
+              </div>
             </div>
 
             <div class="saas-card p-4">
@@ -929,7 +1039,10 @@
                 <span>งบคงเหลือ (10,000฿)</span>
                 <span id="finKpiBudgetBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 tabular-nums">0%</span>
               </div>
-              <p id="finKpiBudgetRemaining" class="text-xl sm:text-2xl font-semibold tabular-nums mt-2">฿10,000</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <p id="finKpiBudgetRemaining" class="text-xl sm:text-2xl font-semibold tabular-nums">฿10,000</p>
+                <div id="finBudgetSparkline" class="shrink-0" title="แนวโน้มการใช้อัตรางบประมาณ"></div>
+              </div>
               <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-2.5">
                 <div id="finKpiBudgetBar" class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: 0%"></div>
               </div>
@@ -940,8 +1053,13 @@
                 <span>เงินลงทุนสะสม</span>
                 <i data-lucide="landmark" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiInvest" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums mt-2">฿0</p>
-              <p id="finKpiInvestSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">Investment Transfer</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiInvest" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">฿0</p>
+                  <p id="finKpiInvestSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">Investment Transfer</p>
+                </div>
+                <div id="finInvestSparkline" class="shrink-0" title="แนวโน้มเงินลงทุนสะสม"></div>
+              </div>
             </div>
           </div>
 
@@ -1117,9 +1235,12 @@
                   <span>เป้าหมายโปรตีน (115g)</span>
                   <span id="nutGaugeProteinBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">&gt;= 115g</span>
                 </div>
-                <div class="flex items-baseline gap-1.5 mt-2">
-                  <span id="nutGaugeProteinVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0 g</span>
-                  <span id="nutGaugeProteinSubLabel" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 115 g</span>
+                <div class="flex items-baseline justify-between gap-2 mt-2">
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="nutGaugeProteinVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0 g</span>
+                    <span id="nutGaugeProteinSubLabel" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 115 g</span>
+                  </div>
+                  <div id="nutProteinSparkline" class="shrink-0" title="แนวโน้มโปรตีนตามช่วงเวลาที่กรอง"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -1139,13 +1260,18 @@
                   <span>กรอบแคลอรีต่อวัน</span>
                   <span id="nutGaugeCalBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">Optimal</span>
                 </div>
-                <div class="flex items-baseline gap-1.5 mt-2">
-                  <span id="nutGaugeCalMid" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">kcal (Mid)</span>
+                <div class="flex items-baseline justify-between gap-2 mt-2">
+                  <div>
+                    <div class="flex items-baseline gap-1.5">
+                      <span id="nutGaugeCalMid" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400">kcal (Mid)</span>
+                    </div>
+                    <p id="nutGaugeCalRangeText" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
+                      ช่วง Low–High: 0 – 0 kcal
+                    </p>
+                  </div>
+                  <div id="nutCalorieSparkline" class="shrink-0" title="แนวโน้มแคลอรีตามช่วงเวลาที่กรอง"></div>
                 </div>
-                <p id="nutGaugeCalRangeText" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
-                  ช่วง Low–High: 0 – 0 kcal
-                </p>
               </div>
               <div class="mt-3">
                 <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -1164,9 +1290,12 @@
                   <span>ผักและผลไม้รายวัน</span>
                   <span id="nutGaugeVegBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">&gt;= 3.0</span>
                 </div>
-                <div class="flex items-baseline gap-1.5 mt-2">
-                  <span id="nutGaugeVegVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 3.0 ส่วน</span>
+                <div class="flex items-baseline justify-between gap-2 mt-2">
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="nutGaugeVegVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 3.0 ส่วน</span>
+                  </div>
+                  <div id="nutVegSparkline" class="shrink-0" title="แนวโน้มผักผลไม้ตามช่วงเวลาที่กรอง"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -1186,7 +1315,11 @@
                   <span>Health Flags สะสม</span>
                   <span id="nutGaugeFlagTotalBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 tabular-nums">0 มื้อ</span>
                 </div>
-                <div class="grid grid-cols-2 gap-1.5 mt-3 text-xs">
+                <div class="flex items-center justify-between gap-2 mt-2">
+                  <span class="text-xs text-slate-500 dark:text-slate-400">ความถี่มื้อเตือน:</span>
+                  <div id="nutFlagsSparkline" class="shrink-0" title="แนวโน้มความถี่มื้อเตือนสุขภาพ"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 mt-2.5 text-xs">
                   <div class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/80 flex justify-between items-center">
                     <span class="text-slate-600 dark:text-slate-300">ของทอด</span>
                     <strong id="flagCountFried" class="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0</strong>
@@ -1564,6 +1697,9 @@ function toggleTheme() {
   if (APP_STATE.data) {
     renderActiveModeCharts();
     renderFinanceSubCategoryDrilldown();
+    renderOverviewHub();
+    applyFinanceFilters();
+    applyNutritionFilters();
   }
 }
 
@@ -1581,6 +1717,18 @@ function showFutureModuleToast(moduleName) {
     'Module Slot: ' + moduleName,
     'เตรียมโครงสร้างเมนูไว้รองรับการขยาย Dashboard ในอนาคต เพียงผูก Google Sheet ใหม่ใน DataService.gs'
   );
+}
+
+function focusGymWidget() {
+  if (APP_STATE.mode !== 'overview') {
+    switchMode('overview');
+  }
+  const el = document.getElementById('gymWidget');
+  if (el) {
+    setTimeout(function() {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  }
 }
 
 function getChartThemeColors() {
@@ -1906,8 +2054,197 @@ function renderOverviewHub() {
   setText('sidebarFinBadge', formatNum(usedPct, 0) + '%');
   setText('sidebarNutBadge', formatNum(latestDay.proteinG, 0) + 'g');
 
+  // Update Overview Sparklines
+  const finDaily = monthSum.dailySeries || [];
+  let cumExp = 0;
+  const burnSeries = finDaily.map(function(ds) { cumExp += ds.expense; return cumExp; });
+  const dailyExpSeries = finDaily.map(function(ds) { return ds.expense; });
+  const ovNetSeries = finDaily.map(function(ds) { return ds.income - ds.expense; });
+
+  const nutChrono = (d.nutrition.dailySummaries || []).slice(0, 14).reverse();
+  const protSeries = nutChrono.map(function(day) { return day.proteinG; });
+  const calSeries = nutChrono.map(function(day) { return day.calMid; });
+
+  const sparkDark = isDarkMode();
+  const sparkStrokeDefault = sparkDark ? '#CBD5E1' : '#1C1917';
+  const sparkMuted = sparkDark ? '#94A3B8' : '#78716C';
+
+  setHtml('ovBudgetSparkline', renderSparklineSvg_(burnSeries, {
+    color: usedPct > 100 ? '#E11D48' : (usedPct > 80 ? '#D97706' : sparkStrokeDefault),
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovProteinSparkline', renderSparklineSvg_(protSeries, {
+    target: 115,
+    color: latestDay.proteinG >= 115 ? '#059669' : (latestDay.proteinG >= 85 ? '#D97706' : '#E11D48'),
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovCalorieSparkline', renderSparklineSvg_(calSeries, {
+    target: 2100,
+    color: '#2563EB',
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovNetCashflowSparkline', renderSparklineSvg_(ovNetSeries, {
+    color: monthSum.netCashflow >= 0 ? '#059669' : '#E11D48',
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovCardFinSparkline', renderSparklineSvg_(dailyExpSeries.slice(-14), {
+    color: sparkMuted,
+    width: 76,
+    height: 24
+  }));
+
+  setHtml('ovCardNutSparkline', renderSparklineSvg_(protSeries, {
+    target: 115,
+    color: sparkMuted,
+    width: 76,
+    height: 24
+  }));
+
   // Update iOS Medium Widget Live Preview
   updateWidgetPreview_(activeMonth, monthSum, latestDay);
+
+  renderGymWidget_(d.gym);
+}
+
+/**
+ * Gym & Recovery widget. Read-only: every workout action opens the standalone Gym Tracker.
+ * @param {Object|undefined} gym Payload from GymSummaryService.gs
+ */
+function renderGymWidget_(gym) {
+  const g = gym || { available: false, reason: 'not_configured', appUrl: '', fuel: null };
+
+  // Launch buttons (disabled until GYM_APP_URL is set in Script Properties)
+  const launch = document.getElementById('gymLaunchBtn');
+  const express = document.getElementById('gymExpressBtn');
+  const expressSuffix = g.appUrl && g.appUrl.indexOf('?') !== -1 ? '&mode=express' : '?mode=express';
+  [[launch, ''], [express, expressSuffix]].forEach(function(pair) {
+    const el = pair[0];
+    if (!el) return;
+    if (g.appUrl) {
+      el.href = g.appUrl + pair[1];
+      el.removeAttribute('aria-disabled');
+      el.classList.remove('opacity-50', 'pointer-events-none');
+      el.removeAttribute('title');
+    } else {
+      el.removeAttribute('href');
+      el.setAttribute('aria-disabled', 'true');
+      el.classList.add('opacity-50', 'pointer-events-none');
+      el.title = 'ตั้งค่า GYM_APP_URL ใน Script Properties ก่อน';
+    }
+  });
+
+  // Fuel check (Daily_Food) renders even if the gym sheet is unavailable
+  const fuel = g.fuel || { hasLog: false, proteinG: 0, calMid: 0, proteinTargetG: 115 };
+  const target = fuel.proteinTargetG || 115;
+  setText('gymFuelProtein', formatNum(fuel.proteinG, 1) + ' / ' + target + ' g');
+  setText('gymFuelCal', formatNum(fuel.calMid, 0) + ' kcal');
+  setText(
+    'gymFuelCalSub',
+    fuel.hasLog
+      ? 'บันทึกแล้ว ' + (fuel.mealCount || 0) + ' มื้อ • เป้า 1,800–2,100 kcal'
+      : 'ยังไม่ได้บันทึกมื้ออาหารวันนี้ • เป้า 1,800–2,100 kcal'
+  );
+  const pBar = document.getElementById('gymFuelProteinBar');
+  if (pBar) {
+    pBar.style.width = Math.min(100, (fuel.proteinG / target) * 100) + '%';
+    pBar.className = 'h-full rounded-full transition-all duration-300 ' +
+      (fuel.proteinG >= target ? 'bg-emerald-600' : fuel.proteinG >= 85 ? 'bg-amber-500' : 'bg-rose-600');
+  }
+  const cBar = document.getElementById('gymFuelCalBar');
+  if (cBar) cBar.style.width = Math.min(100, (fuel.calMid / 2100) * 100) + '%';
+
+  const badge = document.getElementById('gymStatusBadge');
+  const body = document.getElementById('gymBody');
+  const unavailable = document.getElementById('gymUnavailable');
+
+  if (!g.available) {
+    badge.className = getSemanticBadgeClass_('neutral');
+    badge.textContent = g.reason === 'error' ? 'อ่านข้อมูลไม่ได้' : 'ยังไม่ได้เชื่อมต่อ';
+    setText('sidebarGymBadge', 'Setup');
+    unavailable.classList.remove('hidden');
+    unavailable.textContent = g.reason === 'error'
+      ? 'อ่านชีต Gym Tracker ไม่สำเร็จ (' + (g.error || 'unknown') + ') ตรวจสอบว่าบัญชีที่รัน Web App เปิดชีตนี้ได้ แล้วกด Refresh'
+      : 'ใส่ GYM_SHEET_ID และ GYM_APP_URL ใน Apps Script > Project Settings > Script Properties แล้วกด Refresh';
+    body.classList.add('hidden');
+    return;
+  }
+  unavailable.classList.add('hidden');
+  body.classList.remove('hidden');
+
+  // Status badge
+  const statusMap = {
+    done: { text: 'ฝึกแล้ววันนี้', variant: 'positive' },
+    rest: { text: 'วันพัก', variant: 'warning' },
+    train: { text: 'พร้อมฝึก', variant: 'neutral' }
+  };
+  const st = statusMap[g.status] || statusMap.train;
+  badge.className = getSemanticBadgeClass_(st.variant);
+  badge.textContent = st.text;
+
+  // Next routine + A/B indicator
+  setText('gymNextWorkout', g.nextWorkout);
+  const isA = /A$/.test(g.nextWorkout);
+  const on = 'px-2 py-0.5 bg-stone-900 text-white dark:bg-slate-100 dark:text-slate-900';
+  const off = 'px-2 py-0.5 text-slate-500 dark:text-slate-400';
+  document.getElementById('gymSegA').className = isA ? on : off;
+  document.getElementById('gymSegB').className = (isA ? off : on) + ' border-l border-slate-200 dark:border-slate-700';
+
+  const sideBadgeLabel = g.status === 'done' ? 'Done' : (g.status === 'rest' ? 'Rest' : (isA ? 'FB-A' : 'FB-B'));
+  setText('sidebarGymBadge', sideBadgeLabel);
+
+  const wkTarget = g.weeklyTarget || 3;
+  setText('gymStreakText',
+    'ฝึกติดกัน ' + g.streakDays + ' วัน (พักเมื่อครบ ' + g.maxConsecutiveDays + ') • สัปดาห์นี้ ' + g.weeklyCount + '/' + wkTarget + ' ครั้ง');
+
+  // Cross-domain insight: one sentence, the single most useful next action
+  const gap = Math.max(0, target - fuel.proteinG);
+  let insight;
+  if (g.status === 'done') {
+    insight = !fuel.hasLog
+      ? 'ฝึกเสร็จแล้ว แต่ยังไม่มีบันทึกอาหารวันนี้ บันทึกมื้อหลังฝึกเพื่อดูการฟื้นตัว'
+      : gap > 0
+        ? 'ฝึกเสร็จแล้ว ต้องการโปรตีนอีก ' + formatNum(gap, 0) + ' g เพื่อการฟื้นตัว'
+        : 'ฝึกเสร็จแล้วและโปรตีนถึงเป้า ฟื้นตัวได้เต็มที่';
+  } else if (g.status === 'rest') {
+    insight = 'ฝึกมาแล้ว ' + g.streakDays + ' วันติด วันนี้ควรพัก' +
+      (gap > 0 ? ' และเติมโปรตีนอีก ' + formatNum(gap, 0) + ' g' : ' โปรตีนถึงเป้าแล้ว');
+  } else {
+    insight = 'วันนี้เล่น ' + g.nextWorkout +
+      (gap > 0 ? ' ระหว่างวันยังต้องการโปรตีนอีก ' + formatNum(gap, 0) + ' g' : ' โปรตีนวันนี้ถึงเป้าแล้ว');
+  }
+  setText('gymInsightText', insight);
+
+  // Last session
+  const ls = g.lastSession;
+  if (ls) {
+    setText('gymLastSession', ls.workoutType + ' • ' + ls.date);
+    const parts = [];
+    parts.push(ls.daysAgo === 0 ? 'วันนี้' : ls.daysAgo + ' วันก่อน');
+    if (ls.durationMin) parts.push(formatNum(ls.durationMin, 0) + ' นาที');
+    parts.push(ls.exerciseCount + ' ท่า');
+    setText('gymLastSessionSub', parts.join(' • '));
+  } else {
+    setText('gymLastSession', 'ยังไม่มีเซสชันที่จบแล้ว');
+    setText('gymLastSessionSub', 'เริ่มบันทึกใน Gym Tracker');
+  }
+
+  // Body progress
+  const b = g.body;
+  if (b) {
+    setText('gymBodyWeight', formatNum(b.weightKg, 1) + ' kg' + (b.waistCm ? ' • เอว ' + formatNum(b.waistCm, 1) + ' cm' : ''));
+    setText('gymBodySub', b.date + (b.deltaKg !== null ? ' • ' + (b.deltaKg > 0 ? '+' : '') + formatNum(b.deltaKg, 1) + ' kg จากครั้งก่อน' : ''));
+  } else {
+    setText('gymBodyWeight', '-');
+    setText('gymBodySub', 'ยังไม่มีข้อมูลใน Body_Progress');
+  }
 }
 
 function renderOverviewCrossChart() {
@@ -2157,6 +2494,39 @@ function applyFinanceFilters() {
 
   setText('finKpiInvest', formatTHB(invest, 0));
   setText('finKpiInvestSub', investCount + ' รายการลงทุน/โอน');
+
+  // Aggregate daily series for Finance KPI Sparklines
+  const finDayMap = {};
+  filtered.forEach(function(tx) {
+    if (!finDayMap[tx.date]) finDayMap[tx.date] = { income: 0, expense: 0, invest: 0 };
+    if (tx.type === 'Income') finDayMap[tx.date].income += tx.amount;
+    else if (tx.type === 'Expense') {
+      finDayMap[tx.date].expense += tx.amount;
+      if (tx.mainCat === 'Investment Transfer') finDayMap[tx.date].invest += tx.amount;
+    } else if (tx.type === 'Transfer') {
+      finDayMap[tx.date].invest += tx.amount;
+    }
+  });
+  const sortedFinDates = Object.keys(finDayMap).sort();
+  const incSeries = sortedFinDates.map(function(d) { return finDayMap[d].income; });
+  const expSeries = sortedFinDates.map(function(d) { return finDayMap[d].expense; });
+  const finNetSeries = sortedFinDates.map(function(d) { return finDayMap[d].income - finDayMap[d].expense; });
+  const invSeries = sortedFinDates.map(function(d) { return finDayMap[d].invest; });
+  let cumB = 0;
+  const cumExpSeries = sortedFinDates.map(function(d) { cumB += finDayMap[d].expense; return cumB; });
+
+  const sparkDark = isDarkMode();
+  const sparkStrokeDefault = sparkDark ? '#CBD5E1' : '#1C1917';
+
+  setHtml('finIncomeSparkline', renderSparklineSvg_(incSeries, { color: '#059669', width: 80, height: 26 }));
+  setHtml('finExpenseSparkline', renderSparklineSvg_(expSeries, { color: '#E11D48', width: 80, height: 26 }));
+  setHtml('finNetSparkline', renderSparklineSvg_(finNetSeries, { color: net >= 0 ? '#059669' : '#E11D48', width: 80, height: 26 }));
+  setHtml('finBudgetSparkline', renderSparklineSvg_(cumExpSeries, {
+    color: budgetPct > 100 ? '#E11D48' : (budgetPct > 80 ? '#D97706' : sparkStrokeDefault),
+    width: 80,
+    height: 26
+  }));
+  setHtml('finInvestSparkline', renderSparklineSvg_(invSeries, { color: sparkDark ? '#94A3B8' : '#57534E', width: 80, height: 26 }));
 
   if (APP_STATE.mode === 'finance') {
     renderFinanceCharts();
@@ -2800,6 +3170,37 @@ function applyNutritionFilters() {
   setText('flagCountProcessed', String(flagsCount['highly processed food']));
   setText('flagCountDessert', String(flagsCount['dessert / high added sugar']));
 
+  // Render Nutrition Target Sparklines
+  const chronoDays = (APP_STATE.nutrition.filteredDays || []).slice().reverse();
+  const nutProtSeries = chronoDays.map(function(d) { return d.proteinG; });
+  const nutCalSeries = chronoDays.map(function(d) { return d.calMid; });
+  const nutVegSeries = chronoDays.map(function(d) { return d.vegFruit; });
+  const nutFlagSeries = chronoDays.map(function(d) { return d.warningMealCount; });
+
+  setHtml('nutProteinSparkline', renderSparklineSvg_(nutProtSeries, {
+    target: 115,
+    color: avgProtein >= 115 ? '#059669' : (avgProtein >= 85 ? '#D97706' : '#E11D48'),
+    width: 80,
+    height: 26
+  }));
+  setHtml('nutCalorieSparkline', renderSparklineSvg_(nutCalSeries, {
+    target: 2100,
+    color: '#2563EB',
+    width: 80,
+    height: 26
+  }));
+  setHtml('nutVegSparkline', renderSparklineSvg_(nutVegSeries, {
+    target: 3.0,
+    color: avgVeg >= 3.0 ? '#059669' : '#D97706',
+    width: 80,
+    height: 26
+  }));
+  setHtml('nutFlagsSparkline', renderSparklineSvg_(nutFlagSeries, {
+    color: '#D97706',
+    width: 68,
+    height: 20
+  }));
+
   if (APP_STATE.mode === 'nutrition') {
     renderNutritionCharts();
   }
@@ -3290,6 +3691,81 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+/**
+ * High-performance, zero-dependency inline SVG Sparkline generator.
+ * Renders smooth polyline, gradient fill area, optional target line, and current end-dot.
+ * @param {Array<number>} values Array of numeric values
+ * @param {Object} options Configuration { width, height, color, target, area, strokeWidth }
+ * @return {string} SVG HTML string
+ */
+function renderSparklineSvg_(values, options) {
+  options = options || {};
+  const w = options.width || 80;
+  const h = options.height || 26;
+  const padX = options.padX !== undefined ? options.padX : 3;
+  const padY = options.padY !== undefined ? options.padY : 3;
+  const strokeColor = options.color || (isDarkMode() ? '#CBD5E1' : '#475569');
+  const targetVal = typeof options.target === 'number' ? options.target : null;
+  const showArea = options.area !== false;
+
+  if (!Array.isArray(values) || values.length === 0) {
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" class="overflow-visible opacity-30 block"><line x1="0" y1="' + (h / 2) + '" x2="' + w + '" y2="' + (h / 2) + '" stroke="' + strokeColor + '" stroke-dasharray="2,2" stroke-width="1"/></svg>';
+  }
+
+  const pts = values.length === 1 ? [values[0], values[0]] : values.slice();
+  let min = Math.min.apply(null, pts);
+  let max = Math.max.apply(null, pts);
+  if (targetVal !== null) {
+    min = Math.min(min, targetVal);
+    max = Math.max(max, targetVal);
+  }
+  const range = (max - min) || 1;
+  const drawW = w - padX * 2;
+  const drawH = h - padY * 2;
+
+  const coords = pts.map(function(val, idx) {
+    const x = padX + (idx / (pts.length - 1)) * drawW;
+    const y = padY + drawH - ((val - min) / range) * drawH;
+    return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+  });
+
+  const polylineStr = coords.map(function(c) { return c.x + ',' + c.y; }).join(' ');
+  const gradId = 'spk_' + Math.random().toString(36).slice(2, 8);
+
+  let targetSvg = '';
+  if (targetVal !== null) {
+    const targetY = Math.round((padY + drawH - ((targetVal - min) / range) * drawH) * 10) / 10;
+    targetSvg = '<line x1="0" y1="' + targetY + '" x2="' + w + '" y2="' + targetY + '" stroke="' + strokeColor + '" stroke-opacity="0.35" stroke-dasharray="2,2" stroke-width="1"/>';
+  }
+
+  let areaSvg = '';
+  if (showArea && coords.length > 1) {
+    const first = coords[0];
+    const last = coords[coords.length - 1];
+    const polygonPts = polylineStr + ' ' + last.x + ',' + (h - 1) + ' ' + first.x + ',' + (h - 1);
+    areaSvg = '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + strokeColor + '" stop-opacity="0.22"/>' +
+      '<stop offset="100%" stop-color="' + strokeColor + '" stop-opacity="0.0"/>' +
+      '</linearGradient></defs>' +
+      '<polygon points="' + polygonPts + '" fill="url(#' + gradId + ')"/>';
+  }
+
+  const lastPt = coords[coords.length - 1];
+  const dotSvg = '<circle cx="' + lastPt.x + '" cy="' + lastPt.y + '" r="2" fill="' + strokeColor + '"/>';
+
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" class="overflow-visible block">' +
+    targetSvg +
+    areaSvg +
+    '<polyline points="' + polylineStr + '" fill="none" stroke="' + strokeColor + '" stroke-width="' + (options.strokeWidth || 1.75) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+    dotSvg +
+    '</svg>';
+}
+
 function formatTHB(val, decimals) {
   const num = Number(val) || 0;
   const d = decimals !== undefined ? decimals : 0;
@@ -3600,6 +4076,12 @@ function buildLocalPreviewDataset_() {
           period: '2026-10', income: 18500, expense: 4820, investmentTransfer: 2500,
           netCashflow: 13680, budgetRemaining: 5180, budgetUsedPct: 48.2,
           activeSubscriptionBurn: 858, foodExpense: 2890,
+          dailySeries: [
+            { date: '2026-10-12', income: 0, expense: 343, transfer: 0, foodExpense: 180 },
+            { date: '2026-10-15', income: 0, expense: 2500, transfer: 2500, foodExpense: 165 },
+            { date: '2026-10-16', income: 0, expense: 210, transfer: 0, foodExpense: 180 },
+            { date: '2026-10-17', income: 0, expense: 190, transfer: 0, foodExpense: 145 }
+          ],
           byCategory: { 'Food & Drink': { count: 18, amount: 2890 }, 'Transport': { count: 12, amount: 840 } },
           bySubCategory: {}, byPaymentMethod: {}
         },
@@ -3660,6 +4142,21 @@ function buildLocalPreviewDataset_() {
         { date: '2026-10-16', foodSpendTHB: 180, proteinG: 108.0, calMid: 1865 },
         { date: '2026-10-17', foodSpendTHB: 145, proteinG: 122.5, calMid: 1930 }
       ]
+    },
+    gym: {
+      available: true,
+      appUrl: '',
+      status: 'train',
+      trainedToday: false,
+      streakDays: 1,
+      maxConsecutiveDays: 2,
+      nextWorkout: 'Full Body B',
+      weeklyCount: 2,
+      weeklyTarget: 3,
+      weekStart: '2026-10-12',
+      lastSession: { date: '2026-10-16', workoutType: 'Full Body A', durationMin: 52, exerciseCount: 6, daysAgo: 1 },
+      body: { date: '2026-10-17', weightKg: 68.4, waistCm: 76.5, deltaKg: -0.2 },
+      fuel: { date: today, hasLog: true, proteinG: 98.5, calMid: 1540, mealCount: 2, proteinTargetG: 115, calorieLow: 1800, calorieHigh: 2100 }
     }
   };
 }

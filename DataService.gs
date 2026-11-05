@@ -142,6 +142,7 @@ function fetchUnifiedDashboardData_(forceRefresh) {
     const financeResult = parseFinanceSpreadsheet_(financeSS, todayStr, currentMonthStr);
     const nutritionResult = parseFoodSpreadsheet_(foodSS, todayStr);
     const crossInsights = computeCrossInsights_(financeResult, nutritionResult, currentMonthStr);
+    const gymSummary = buildGymSummary_(todayStr, nutritionResult);
 
     const payload = {
       success: true,
@@ -177,7 +178,8 @@ function fetchUnifiedDashboardData_(forceRefresh) {
       },
       finance: financeResult,
       nutrition: nutritionResult,
-      crossInsights: crossInsights
+      crossInsights: crossInsights,
+      gym: gymSummary
     };
 
     if (cache) {

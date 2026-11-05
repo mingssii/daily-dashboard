@@ -1,6 +1,7 @@
 **/**
 !Code.gs
 !DataService.gs
+!GymSummaryService.gs
 !SheetDesigner.gs
 !Index.html
 !Styles.html

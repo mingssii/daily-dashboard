@@ -131,6 +131,15 @@
             </span>
             <span id="sidebarNutBadge" class="sidebar-badge text-xs font-mono tabular-nums text-emerald-700 dark:text-emerald-400">0g</span>
           </button>
+
+          <button id="nav-gym" onclick="focusGymWidget()" title="Gym & Recovery"
+            class="sidebar-nav-item w-full flex items-center justify-between gap-2.5 px-3 py-2 rounded-lg text-xs cursor-pointer">
+            <span class="flex items-center gap-2.5 truncate">
+              <i data-lucide="dumbbell" class="w-4 h-4 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
+              <span class="sidebar-label truncate">Gym &amp; Recovery</span>
+            </span>
+            <span id="sidebarGymBadge" class="sidebar-badge text-xs font-mono tabular-nums text-slate-600 dark:text-slate-400">A/B</span>
+          </button>
         </div>
 
         <!-- Section 2: Future Expansion Slots (Scalable Multi-Dashboard Architecture) -->
@@ -139,15 +148,6 @@
             <span>Future Modules</span>
             <span class="font-mono text-xs">Slots</span>
           </div>
-
-          <button onclick="showFutureModuleToast('Workout & Cardio Tracker')" title="Workout & Cardio (Slot)"
-            class="sidebar-nav-item w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs opacity-75 cursor-pointer">
-            <span class="flex items-center gap-2.5 truncate">
-              <i data-lucide="heart-pulse" class="w-4 h-4 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
-              <span class="sidebar-label truncate">Workout &amp; Cardio</span>
-            </span>
-            <span class="sidebar-badge px-1.5 py-0.5 rounded text-xs font-mono bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-400">Slot</span>
-          </button>
 
           <button onclick="showFutureModuleToast('Habit & Sleep Matrix')" title="Habit & Sleep (Slot)"
             class="sidebar-nav-item w-full flex items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg text-xs opacity-75 cursor-pointer">
@@ -399,8 +399,11 @@
                   <span id="ovBudgetBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 tabular-nums">On Track</span>
                 </div>
                 <div class="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span id="ovBudgetSpent" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">฿0</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ ฿10,000</span>
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="ovBudgetSpent" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">฿0</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ ฿10,000</span>
+                  </div>
+                  <div id="ovBudgetSparkline" class="shrink-0" title="แนวโน้มรายจ่ายสะสมเดือนนี้"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -425,8 +428,11 @@
                   <span id="ovProteinBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">&lt; 85g</span>
                 </div>
                 <div class="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span id="ovProteinVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 g</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">เป้า 115 g</span>
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="ovProteinVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 g</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">เป้า 115 g</span>
+                  </div>
+                  <div id="ovProteinSparkline" class="shrink-0" title="แนวโน้มโปรตีนย้อนหลัง 14 วัน"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -451,8 +457,11 @@
                   <span id="ovCalorieBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">-</span>
                 </div>
                 <div class="mt-2.5 flex items-baseline justify-between gap-2">
-                  <span id="ovCalorieMidVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 kcal</span>
-                  <span id="ovCalorieBandSub" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">(0–0)</span>
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="ovCalorieMidVal" class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-slate-100 tabular-nums">0 kcal</span>
+                    <span id="ovCalorieBandSub" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">(0–0)</span>
+                  </div>
+                  <div id="ovCalorieSparkline" class="shrink-0" title="แนวโน้มพลังงานแคลอรี่ย้อนหลัง 14 วัน"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -476,8 +485,9 @@
                   </span>
                   <span id="ovSubDueBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 tabular-nums">0 Due</span>
                 </div>
-                <div class="mt-2.5 flex items-baseline gap-1.5">
+                <div class="mt-2.5 flex items-baseline justify-between gap-2">
                   <span id="ovNetCashflowVal" class="text-2xl font-semibold tracking-tight tabular-nums">฿0</span>
+                  <div id="ovNetCashflowSparkline" class="shrink-0" title="แนวโน้มกระแสเงินสดสุทธิรายวัน"></div>
                 </div>
               </div>
               <div class="mt-4 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex justify-between items-center text-xs tabular-nums">
@@ -486,6 +496,85 @@
               </div>
             </div>
 
+          </div>
+
+          <!-- Gym & Recovery Widget (read-only summary of the standalone Gym Tracker) -->
+          <div id="gymWidget" class="saas-card p-5 sm:p-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200 dark:border-slate-800">
+              <div class="flex items-center gap-2">
+                <i data-lucide="dumbbell" class="w-4 h-4 text-slate-500 dark:text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
+                <h2 class="text-base font-semibold tracking-tight text-slate-900 dark:text-slate-100">Gym &amp; Recovery</h2>
+                <span id="gymStatusBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 tabular-nums">-</span>
+              </div>
+              <div class="grid grid-cols-1 sm:flex items-center gap-2">
+                <a id="gymExpressBtn" target="_blank" rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:focus-visible:outline-slate-200">
+                  <i data-lucide="timer" class="w-3.5 h-3.5 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
+                  <span>30-Min Express Mode</span>
+                </a>
+                <a id="gymLaunchBtn" target="_blank" rel="noopener noreferrer"
+                  class="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-lg text-xs font-semibold bg-stone-900 hover:bg-stone-800 text-white dark:bg-slate-100 dark:hover:bg-slate-200 dark:text-slate-900 transition cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-900 dark:focus-visible:outline-slate-200">
+                  <span>Launch Gym Tracker</span>
+                  <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 shrink-0" stroke-width="1.75" aria-hidden="true"></i>
+                </a>
+              </div>
+            </div>
+
+            <div id="gymUnavailable" class="hidden mt-4 p-4 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs text-slate-600 dark:text-slate-400 leading-relaxed"></div>
+
+            <div id="gymBody" class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-5">
+              <!-- Next routine & readiness -->
+              <div class="lg:col-span-5 space-y-3">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">ครั้งถัดไป</span>
+                <div class="flex items-center gap-3">
+                  <span id="gymNextWorkout" class="text-3xl font-semibold tracking-tight text-slate-900 dark:text-slate-100">-</span>
+                  <span class="inline-flex rounded-md border border-slate-200 dark:border-slate-700 overflow-hidden text-xs font-mono" aria-hidden="true">
+                    <span id="gymSegA" class="px-2 py-0.5">A</span>
+                    <span id="gymSegB" class="px-2 py-0.5 border-l border-slate-200 dark:border-slate-700">B</span>
+                  </span>
+                </div>
+                <p id="gymStreakText" class="text-xs text-slate-600 dark:text-slate-400 tabular-nums">-</p>
+                <p id="gymInsightText" class="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">-</p>
+              </div>
+
+              <!-- Fuel check -->
+              <div class="lg:col-span-4 space-y-4 lg:border-l lg:pl-6 border-slate-200 dark:border-slate-800">
+                <span class="text-xs font-medium text-slate-500 dark:text-slate-400">อาหารวันนี้</span>
+                <div>
+                  <div class="flex items-baseline justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-400">โปรตีน</span>
+                    <span id="gymFuelProtein" class="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0 / 115 g</span>
+                  </div>
+                  <div class="mt-1.5 w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div id="gymFuelProteinBar" class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                </div>
+                <div>
+                  <div class="flex items-baseline justify-between text-xs">
+                    <span class="text-slate-600 dark:text-slate-400">พลังงาน (Mid)</span>
+                    <span id="gymFuelCal" class="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0 kcal</span>
+                  </div>
+                  <div class="mt-1.5 w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div id="gymFuelCalBar" class="h-full bg-blue-600 rounded-full transition-all duration-300" style="width: 0%"></div>
+                  </div>
+                  <p id="gymFuelCalSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1.5 tabular-nums">เป้า 1,800–2,100 kcal</p>
+                </div>
+              </div>
+
+              <!-- Last session & body -->
+              <dl class="lg:col-span-3 space-y-3 text-xs lg:border-l lg:pl-6 border-slate-200 dark:border-slate-800">
+                <div>
+                  <dt class="text-slate-500 dark:text-slate-400">ครั้งล่าสุด</dt>
+                  <dd id="gymLastSession" class="mt-0.5 font-medium text-slate-900 dark:text-slate-100 tabular-nums">-</dd>
+                  <dd id="gymLastSessionSub" class="text-slate-500 dark:text-slate-400 tabular-nums">-</dd>
+                </div>
+                <div>
+                  <dt class="text-slate-500 dark:text-slate-400">น้ำหนักตัวล่าสุด</dt>
+                  <dd id="gymBodyWeight" class="mt-0.5 font-medium text-slate-900 dark:text-slate-100 tabular-nums">-</dd>
+                  <dd id="gymBodySub" class="text-slate-500 dark:text-slate-400 tabular-nums">-</dd>
+                </div>
+              </dl>
+            </div>
           </div>
 
           <!-- Domain Quick-Switch Cards -->
@@ -507,9 +596,12 @@
                     วิเคราะห์กระแสเงินสด งบ ฿10,000/เดือน เจาะลึกหมวดหมู่ย่อย และแจ้งเตือนรอบตัดบัตร
                   </p>
                 </div>
-                <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
-                  <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
-                </span>
+                <div class="flex items-center gap-2.5">
+                  <div id="ovCardFinSparkline" class="shrink-0" title="แนวโน้มรายจ่าย 14 วันล่าสุด"></div>
+                  <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
+                  </span>
+                </div>
               </div>
               <div class="mt-4 pt-3 border-t border-slate-200/80 dark:border-slate-800 grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -544,9 +636,12 @@
                     ติดตามโปรตีน ช่วงแคลอรี 1,800–2,100 kcal ผักผลไม้ 3 ส่วน และแนวโน้มน้ำหนัก/ออกกำลังกาย
                   </p>
                 </div>
-                <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
-                  <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
-                </span>
+                <div class="flex items-center gap-2.5">
+                  <div id="ovCardNutSparkline" class="shrink-0" title="แนวโน้มโปรตีน 14 วันล่าสุด"></div>
+                  <span class="p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 text-slate-700 dark:text-slate-300 group-hover:bg-stone-900 group-hover:text-white dark:group-hover:bg-slate-100 dark:group-hover:text-slate-900 transition">
+                    <i data-lucide="arrow-up-right" class="w-4 h-4" stroke-width="1.75" aria-hidden="true"></i>
+                  </span>
+                </div>
               </div>
               <div class="mt-4 pt-3 border-t border-slate-200/80 dark:border-slate-800 grid grid-cols-3 gap-2 text-xs">
                 <div>
@@ -714,8 +809,13 @@
                 <span>รายรับรวม</span>
                 <i data-lucide="trending-up" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiIncome" class="text-xl sm:text-2xl font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums mt-2">฿0</p>
-              <p id="finKpiIncomeSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiIncome" class="text-xl sm:text-2xl font-semibold text-emerald-700 dark:text-emerald-400 tabular-nums">฿0</p>
+                  <p id="finKpiIncomeSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+                </div>
+                <div id="finIncomeSparkline" class="shrink-0" title="แนวโน้มรายรับ"></div>
+              </div>
             </div>
 
             <div class="saas-card p-4">
@@ -723,8 +823,13 @@
                 <span>รายจ่ายรวม</span>
                 <i data-lucide="trending-down" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiExpense" class="text-xl sm:text-2xl font-semibold text-rose-600 dark:text-rose-400 tabular-nums mt-2">฿0</p>
-              <p id="finKpiExpenseSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiExpense" class="text-xl sm:text-2xl font-semibold text-rose-600 dark:text-rose-400 tabular-nums">฿0</p>
+                  <p id="finKpiExpenseSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">0 รายการ</p>
+                </div>
+                <div id="finExpenseSparkline" class="shrink-0" title="แนวโน้มรายจ่าย"></div>
+              </div>
             </div>
 
             <div class="saas-card p-4">
@@ -732,8 +837,13 @@
                 <span>กระแสเงินสดสุทธิ</span>
                 <i data-lucide="scale" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiNet" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums mt-2">฿0</p>
-              <p id="finKpiNetSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Income - Expense</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiNet" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">฿0</p>
+                  <p id="finKpiNetSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1">Income - Expense</p>
+                </div>
+                <div id="finNetSparkline" class="shrink-0" title="แนวโน้มกระแสเงินสดสุทธิ"></div>
+              </div>
             </div>
 
             <div class="saas-card p-4">
@@ -741,7 +851,10 @@
                 <span>งบคงเหลือ (10,000฿)</span>
                 <span id="finKpiBudgetBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 tabular-nums">0%</span>
               </div>
-              <p id="finKpiBudgetRemaining" class="text-xl sm:text-2xl font-semibold tabular-nums mt-2">฿10,000</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <p id="finKpiBudgetRemaining" class="text-xl sm:text-2xl font-semibold tabular-nums">฿10,000</p>
+                <div id="finBudgetSparkline" class="shrink-0" title="แนวโน้มการใช้อัตรางบประมาณ"></div>
+              </div>
               <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mt-2.5">
                 <div id="finKpiBudgetBar" class="h-full bg-emerald-600 rounded-full transition-all duration-300" style="width: 0%"></div>
               </div>
@@ -752,8 +865,13 @@
                 <span>เงินลงทุนสะสม</span>
                 <i data-lucide="landmark" class="w-4 h-4 text-slate-400" stroke-width="1.75" aria-hidden="true"></i>
               </div>
-              <p id="finKpiInvest" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums mt-2">฿0</p>
-              <p id="finKpiInvestSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">Investment Transfer</p>
+              <div class="flex items-baseline justify-between gap-2 mt-2">
+                <div>
+                  <p id="finKpiInvest" class="text-xl sm:text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">฿0</p>
+                  <p id="finKpiInvestSub" class="text-xs text-slate-500 dark:text-slate-400 mt-1 tabular-nums">Investment Transfer</p>
+                </div>
+                <div id="finInvestSparkline" class="shrink-0" title="แนวโน้มเงินลงทุนสะสม"></div>
+              </div>
             </div>
           </div>
 
@@ -929,9 +1047,12 @@
                   <span>เป้าหมายโปรตีน (115g)</span>
                   <span id="nutGaugeProteinBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">&gt;= 115g</span>
                 </div>
-                <div class="flex items-baseline gap-1.5 mt-2">
-                  <span id="nutGaugeProteinVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0 g</span>
-                  <span id="nutGaugeProteinSubLabel" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 115 g</span>
+                <div class="flex items-baseline justify-between gap-2 mt-2">
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="nutGaugeProteinVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0 g</span>
+                    <span id="nutGaugeProteinSubLabel" class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 115 g</span>
+                  </div>
+                  <div id="nutProteinSparkline" class="shrink-0" title="แนวโน้มโปรตีนตามช่วงเวลาที่กรอง"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -951,13 +1072,18 @@
                   <span>กรอบแคลอรีต่อวัน</span>
                   <span id="nutGaugeCalBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">Optimal</span>
                 </div>
-                <div class="flex items-baseline gap-1.5 mt-2">
-                  <span id="nutGaugeCalMid" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400">kcal (Mid)</span>
+                <div class="flex items-baseline justify-between gap-2 mt-2">
+                  <div>
+                    <div class="flex items-baseline gap-1.5">
+                      <span id="nutGaugeCalMid" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0</span>
+                      <span class="text-xs text-slate-500 dark:text-slate-400">kcal (Mid)</span>
+                    </div>
+                    <p id="nutGaugeCalRangeText" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
+                      ช่วง Low–High: 0 – 0 kcal
+                    </p>
+                  </div>
+                  <div id="nutCalorieSparkline" class="shrink-0" title="แนวโน้มแคลอรีตามช่วงเวลาที่กรอง"></div>
                 </div>
-                <p id="nutGaugeCalRangeText" class="text-xs text-slate-500 dark:text-slate-400 mt-0.5 tabular-nums">
-                  ช่วง Low–High: 0 – 0 kcal
-                </p>
               </div>
               <div class="mt-3">
                 <div class="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -976,9 +1102,12 @@
                   <span>ผักและผลไม้รายวัน</span>
                   <span id="nutGaugeVegBadge" class="px-2 py-0.5 rounded-md text-xs font-medium tabular-nums">&gt;= 3.0</span>
                 </div>
-                <div class="flex items-baseline gap-1.5 mt-2">
-                  <span id="nutGaugeVegVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0</span>
-                  <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 3.0 ส่วน</span>
+                <div class="flex items-baseline justify-between gap-2 mt-2">
+                  <div class="flex items-baseline gap-1.5">
+                    <span id="nutGaugeVegVal" class="text-2xl font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0.0</span>
+                    <span class="text-xs text-slate-500 dark:text-slate-400 tabular-nums">/ 3.0 ส่วน</span>
+                  </div>
+                  <div id="nutVegSparkline" class="shrink-0" title="แนวโน้มผักผลไม้ตามช่วงเวลาที่กรอง"></div>
                 </div>
               </div>
               <div class="mt-4">
@@ -998,7 +1127,11 @@
                   <span>Health Flags สะสม</span>
                   <span id="nutGaugeFlagTotalBadge" class="px-2 py-0.5 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700 tabular-nums">0 มื้อ</span>
                 </div>
-                <div class="grid grid-cols-2 gap-1.5 mt-3 text-xs">
+                <div class="flex items-center justify-between gap-2 mt-2">
+                  <span class="text-xs text-slate-500 dark:text-slate-400">ความถี่มื้อเตือน:</span>
+                  <div id="nutFlagsSparkline" class="shrink-0" title="แนวโน้มความถี่มื้อเตือนสุขภาพ"></div>
+                </div>
+                <div class="grid grid-cols-2 gap-1.5 mt-2.5 text-xs">
                   <div class="px-2.5 py-1.5 rounded-lg bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/80 flex justify-between items-center">
                     <span class="text-slate-600 dark:text-slate-300">ของทอด</span>
                     <strong id="flagCountFried" class="font-semibold text-slate-900 dark:text-slate-100 tabular-nums">0</strong>

@@ -8,7 +8,9 @@ const APP_CONFIG = Object.freeze({
   TIMEZONE: 'Asia/Bangkok',
   DEFAULT_FINANCE_SS_ID: 'YOUR_FINANCE_SPREADSHEET_ID',
   DEFAULT_FOOD_SS_ID: 'YOUR_FOOD_SPREADSHEET_ID',
-  CACHE_KEY_UNIFIED: 'UNIFIED_LIFE_DASHBOARD_V3',
+  GYM_SHEET_ID: 'YOUR_GYM_SHEET_ID',
+  GYM_APP_URL: 'YOUR_GYM_APP_URL',
+  CACHE_KEY_UNIFIED: 'UNIFIED_LIFE_DASHBOARD_V4',
   CACHE_TTL_SECONDS: 180,
   LIVE_WEBAPP_URL: 'https://script.google.com/macros/s/AKfycbyq6FrcVrN1AxhWMaO8i7oFwmXIBiTrod55lCYvQrESfim4YIzHN0OJywO1rzvAKHCuQA/exec',
   TARGETS: Object.freeze({
@@ -17,7 +19,9 @@ const APP_CONFIG = Object.freeze({
     PROTEIN_WARN_G: 85,
     CALORIE_LOW: 1800,
     CALORIE_HIGH: 2100,
-    VEG_FRUIT_PORTIONS: 3.0
+    VEG_FRUIT_PORTIONS: 3.0,
+    GYM_MAX_CONSECUTIVE_DAYS: 2,
+    GYM_WEEKLY_SESSIONS: 3
   }),
   SHEETS: Object.freeze({
     OUTCOME: 'Outcome',
@@ -26,7 +30,13 @@ const APP_CONFIG = Object.freeze({
     MONTHLY_DASHBOARD: 'Monthly_Dashboard',
     FOOD_LOG: 'Food_Log',
     BODY_WORKOUT_LOG: 'Body_Workout_Log',
-    DAILY_NUTRITION_SUMMARY: 'Daily_Nutrition_Summary'
+    DAILY_NUTRITION_SUMMARY: 'Daily_Nutrition_Summary',
+    GYM_PROFILE: 'Profile',
+    GYM_EXERCISES: 'Exercise_Library',
+    GYM_TEMPLATES: 'Workout_Templates',
+    GYM_SESSIONS: 'Session_Log',
+    GYM_WORKOUT_LOG: 'Workout_Log',
+    GYM_BODY_PROGRESS: 'Body_Progress'
   })
 });
 
@@ -183,15 +193,23 @@ function include(filename) {
 /**
  * Resolves Spreadsheet IDs from ScriptProperties with automatic one-time persistence
  * so public repository commits do not require hardcoded Spreadsheet IDs.
- * @return {{financeSpreadsheetId: string, foodSpreadsheetId: string}}
+ * @return {{financeSpreadsheetId: string, foodSpreadsheetId: string, gymSpreadsheetId: string}}
  */
 function getSpreadsheetIds_() {
   let financeId = APP_CONFIG.DEFAULT_FINANCE_SS_ID;
   let foodId = APP_CONFIG.DEFAULT_FOOD_SS_ID;
+  let gymId = APP_CONFIG.GYM_SHEET_ID;
   try {
     const props = PropertiesService.getScriptProperties();
-    const customFinanceId = props.getProperty('FINANCE_SPREADSHEET_ID');
-    const customFoodId = props.getProperty('FOOD_SPREADSHEET_ID');
+    const customFinanceId = props.getProperty('FINANCE_SPREADSHEET_ID') || props.getProperty('FINANCE_SHEET_ID');
+    const customFoodId = props.getProperty('FOOD_SPREADSHEET_ID') || props.getProperty('FOOD_SHEET_ID');
+    const customGymId = props.getProperty('GYM_SHEET_ID') || props.getProperty('GYM_SPREADSHEET_ID');
+
+    if (customGymId && customGymId.trim()) {
+      gymId = customGymId.trim();
+    } else if (gymId && gymId.indexOf('YOUR_') === -1) {
+      props.setProperty('GYM_SHEET_ID', gymId);
+    }
 
     if (customFinanceId && customFinanceId.trim()) {
       financeId = customFinanceId.trim();
@@ -209,6 +227,29 @@ function getSpreadsheetIds_() {
   }
   return {
     financeSpreadsheetId: financeId,
-    foodSpreadsheetId: foodId
+    foodSpreadsheetId: foodId,
+    gymSpreadsheetId: gymId
   };
+}
+
+/**
+ * Resolves the standalone Gym Tracker Web App /exec URL from ScriptProperties (GYM_APP_URL).
+ * Returns '' when unset so the frontend can disable the launch buttons instead of opening a placeholder.
+ * @return {string}
+ */
+function getGymAppUrl_() {
+  let url = APP_CONFIG.GYM_APP_URL;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const custom = props.getProperty('GYM_APP_URL');
+    if (custom && custom.trim()) {
+      url = custom.trim();
+    } else if (url && url.indexOf('YOUR_') === -1) {
+      props.setProperty('GYM_APP_URL', url);
+    }
+  } catch (err) {
+    console.warn('PropertiesService read fallback applied (GYM_APP_URL)');
+  }
+  const cleaned = String(url ?? '').trim().replace(/\/+$/, '');
+  return /^https:\/\/script\.google\.com\/.+\/(exec|dev)$/i.test(cleaned) ? cleaned : '';
 }

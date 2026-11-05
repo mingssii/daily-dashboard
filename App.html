@@ -82,6 +82,9 @@ function toggleTheme() {
   if (APP_STATE.data) {
     renderActiveModeCharts();
     renderFinanceSubCategoryDrilldown();
+    renderOverviewHub();
+    applyFinanceFilters();
+    applyNutritionFilters();
   }
 }
 
@@ -99,6 +102,18 @@ function showFutureModuleToast(moduleName) {
     'Module Slot: ' + moduleName,
     'เตรียมโครงสร้างเมนูไว้รองรับการขยาย Dashboard ในอนาคต เพียงผูก Google Sheet ใหม่ใน DataService.gs'
   );
+}
+
+function focusGymWidget() {
+  if (APP_STATE.mode !== 'overview') {
+    switchMode('overview');
+  }
+  const el = document.getElementById('gymWidget');
+  if (el) {
+    setTimeout(function() {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 60);
+  }
 }
 
 function getChartThemeColors() {
@@ -424,8 +439,197 @@ function renderOverviewHub() {
   setText('sidebarFinBadge', formatNum(usedPct, 0) + '%');
   setText('sidebarNutBadge', formatNum(latestDay.proteinG, 0) + 'g');
 
+  // Update Overview Sparklines
+  const finDaily = monthSum.dailySeries || [];
+  let cumExp = 0;
+  const burnSeries = finDaily.map(function(ds) { cumExp += ds.expense; return cumExp; });
+  const dailyExpSeries = finDaily.map(function(ds) { return ds.expense; });
+  const ovNetSeries = finDaily.map(function(ds) { return ds.income - ds.expense; });
+
+  const nutChrono = (d.nutrition.dailySummaries || []).slice(0, 14).reverse();
+  const protSeries = nutChrono.map(function(day) { return day.proteinG; });
+  const calSeries = nutChrono.map(function(day) { return day.calMid; });
+
+  const sparkDark = isDarkMode();
+  const sparkStrokeDefault = sparkDark ? '#CBD5E1' : '#1C1917';
+  const sparkMuted = sparkDark ? '#94A3B8' : '#78716C';
+
+  setHtml('ovBudgetSparkline', renderSparklineSvg_(burnSeries, {
+    color: usedPct > 100 ? '#E11D48' : (usedPct > 80 ? '#D97706' : sparkStrokeDefault),
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovProteinSparkline', renderSparklineSvg_(protSeries, {
+    target: 115,
+    color: latestDay.proteinG >= 115 ? '#059669' : (latestDay.proteinG >= 85 ? '#D97706' : '#E11D48'),
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovCalorieSparkline', renderSparklineSvg_(calSeries, {
+    target: 2100,
+    color: '#2563EB',
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovNetCashflowSparkline', renderSparklineSvg_(ovNetSeries, {
+    color: monthSum.netCashflow >= 0 ? '#059669' : '#E11D48',
+    width: 84,
+    height: 26
+  }));
+
+  setHtml('ovCardFinSparkline', renderSparklineSvg_(dailyExpSeries.slice(-14), {
+    color: sparkMuted,
+    width: 76,
+    height: 24
+  }));
+
+  setHtml('ovCardNutSparkline', renderSparklineSvg_(protSeries, {
+    target: 115,
+    color: sparkMuted,
+    width: 76,
+    height: 24
+  }));
+
   // Update iOS Medium Widget Live Preview
   updateWidgetPreview_(activeMonth, monthSum, latestDay);
+
+  renderGymWidget_(d.gym);
+}
+
+/**
+ * Gym & Recovery widget. Read-only: every workout action opens the standalone Gym Tracker.
+ * @param {Object|undefined} gym Payload from GymSummaryService.gs
+ */
+function renderGymWidget_(gym) {
+  const g = gym || { available: false, reason: 'not_configured', appUrl: '', fuel: null };
+
+  // Launch buttons (disabled until GYM_APP_URL is set in Script Properties)
+  const launch = document.getElementById('gymLaunchBtn');
+  const express = document.getElementById('gymExpressBtn');
+  const expressSuffix = g.appUrl && g.appUrl.indexOf('?') !== -1 ? '&mode=express' : '?mode=express';
+  [[launch, ''], [express, expressSuffix]].forEach(function(pair) {
+    const el = pair[0];
+    if (!el) return;
+    if (g.appUrl) {
+      el.href = g.appUrl + pair[1];
+      el.removeAttribute('aria-disabled');
+      el.classList.remove('opacity-50', 'pointer-events-none');
+      el.removeAttribute('title');
+    } else {
+      el.removeAttribute('href');
+      el.setAttribute('aria-disabled', 'true');
+      el.classList.add('opacity-50', 'pointer-events-none');
+      el.title = 'ตั้งค่า GYM_APP_URL ใน Script Properties ก่อน';
+    }
+  });
+
+  // Fuel check (Daily_Food) renders even if the gym sheet is unavailable
+  const fuel = g.fuel || { hasLog: false, proteinG: 0, calMid: 0, proteinTargetG: 115 };
+  const target = fuel.proteinTargetG || 115;
+  setText('gymFuelProtein', formatNum(fuel.proteinG, 1) + ' / ' + target + ' g');
+  setText('gymFuelCal', formatNum(fuel.calMid, 0) + ' kcal');
+  setText(
+    'gymFuelCalSub',
+    fuel.hasLog
+      ? 'บันทึกแล้ว ' + (fuel.mealCount || 0) + ' มื้อ • เป้า 1,800–2,100 kcal'
+      : 'ยังไม่ได้บันทึกมื้ออาหารวันนี้ • เป้า 1,800–2,100 kcal'
+  );
+  const pBar = document.getElementById('gymFuelProteinBar');
+  if (pBar) {
+    pBar.style.width = Math.min(100, (fuel.proteinG / target) * 100) + '%';
+    pBar.className = 'h-full rounded-full transition-all duration-300 ' +
+      (fuel.proteinG >= target ? 'bg-emerald-600' : fuel.proteinG >= 85 ? 'bg-amber-500' : 'bg-rose-600');
+  }
+  const cBar = document.getElementById('gymFuelCalBar');
+  if (cBar) cBar.style.width = Math.min(100, (fuel.calMid / 2100) * 100) + '%';
+
+  const badge = document.getElementById('gymStatusBadge');
+  const body = document.getElementById('gymBody');
+  const unavailable = document.getElementById('gymUnavailable');
+
+  if (!g.available) {
+    badge.className = getSemanticBadgeClass_('neutral');
+    badge.textContent = g.reason === 'error' ? 'อ่านข้อมูลไม่ได้' : 'ยังไม่ได้เชื่อมต่อ';
+    setText('sidebarGymBadge', 'Setup');
+    unavailable.classList.remove('hidden');
+    unavailable.textContent = g.reason === 'error'
+      ? 'อ่านชีต Gym Tracker ไม่สำเร็จ (' + (g.error || 'unknown') + ') ตรวจสอบว่าบัญชีที่รัน Web App เปิดชีตนี้ได้ แล้วกด Refresh'
+      : 'ใส่ GYM_SHEET_ID และ GYM_APP_URL ใน Apps Script > Project Settings > Script Properties แล้วกด Refresh';
+    body.classList.add('hidden');
+    return;
+  }
+  unavailable.classList.add('hidden');
+  body.classList.remove('hidden');
+
+  // Status badge
+  const statusMap = {
+    done: { text: 'ฝึกแล้ววันนี้', variant: 'positive' },
+    rest: { text: 'วันพัก', variant: 'warning' },
+    train: { text: 'พร้อมฝึก', variant: 'neutral' }
+  };
+  const st = statusMap[g.status] || statusMap.train;
+  badge.className = getSemanticBadgeClass_(st.variant);
+  badge.textContent = st.text;
+
+  // Next routine + A/B indicator
+  setText('gymNextWorkout', g.nextWorkout);
+  const isA = /A$/.test(g.nextWorkout);
+  const on = 'px-2 py-0.5 bg-stone-900 text-white dark:bg-slate-100 dark:text-slate-900';
+  const off = 'px-2 py-0.5 text-slate-500 dark:text-slate-400';
+  document.getElementById('gymSegA').className = isA ? on : off;
+  document.getElementById('gymSegB').className = (isA ? off : on) + ' border-l border-slate-200 dark:border-slate-700';
+
+  const sideBadgeLabel = g.status === 'done' ? 'Done' : (g.status === 'rest' ? 'Rest' : (isA ? 'FB-A' : 'FB-B'));
+  setText('sidebarGymBadge', sideBadgeLabel);
+
+  const wkTarget = g.weeklyTarget || 3;
+  setText('gymStreakText',
+    'ฝึกติดกัน ' + g.streakDays + ' วัน (พักเมื่อครบ ' + g.maxConsecutiveDays + ') • สัปดาห์นี้ ' + g.weeklyCount + '/' + wkTarget + ' ครั้ง');
+
+  // Cross-domain insight: one sentence, the single most useful next action
+  const gap = Math.max(0, target - fuel.proteinG);
+  let insight;
+  if (g.status === 'done') {
+    insight = !fuel.hasLog
+      ? 'ฝึกเสร็จแล้ว แต่ยังไม่มีบันทึกอาหารวันนี้ บันทึกมื้อหลังฝึกเพื่อดูการฟื้นตัว'
+      : gap > 0
+        ? 'ฝึกเสร็จแล้ว ต้องการโปรตีนอีก ' + formatNum(gap, 0) + ' g เพื่อการฟื้นตัว'
+        : 'ฝึกเสร็จแล้วและโปรตีนถึงเป้า ฟื้นตัวได้เต็มที่';
+  } else if (g.status === 'rest') {
+    insight = 'ฝึกมาแล้ว ' + g.streakDays + ' วันติด วันนี้ควรพัก' +
+      (gap > 0 ? ' และเติมโปรตีนอีก ' + formatNum(gap, 0) + ' g' : ' โปรตีนถึงเป้าแล้ว');
+  } else {
+    insight = 'วันนี้เล่น ' + g.nextWorkout +
+      (gap > 0 ? ' ระหว่างวันยังต้องการโปรตีนอีก ' + formatNum(gap, 0) + ' g' : ' โปรตีนวันนี้ถึงเป้าแล้ว');
+  }
+  setText('gymInsightText', insight);
+
+  // Last session
+  const ls = g.lastSession;
+  if (ls) {
+    setText('gymLastSession', ls.workoutType + ' • ' + ls.date);
+    const parts = [];
+    parts.push(ls.daysAgo === 0 ? 'วันนี้' : ls.daysAgo + ' วันก่อน');
+    if (ls.durationMin) parts.push(formatNum(ls.durationMin, 0) + ' นาที');
+    parts.push(ls.exerciseCount + ' ท่า');
+    setText('gymLastSessionSub', parts.join(' • '));
+  } else {
+    setText('gymLastSession', 'ยังไม่มีเซสชันที่จบแล้ว');
+    setText('gymLastSessionSub', 'เริ่มบันทึกใน Gym Tracker');
+  }
+
+  // Body progress
+  const b = g.body;
+  if (b) {
+    setText('gymBodyWeight', formatNum(b.weightKg, 1) + ' kg' + (b.waistCm ? ' • เอว ' + formatNum(b.waistCm, 1) + ' cm' : ''));
+    setText('gymBodySub', b.date + (b.deltaKg !== null ? ' • ' + (b.deltaKg > 0 ? '+' : '') + formatNum(b.deltaKg, 1) + ' kg จากครั้งก่อน' : ''));
+  } else {
+    setText('gymBodyWeight', '-');
+    setText('gymBodySub', 'ยังไม่มีข้อมูลใน Body_Progress');
+  }
 }
 
 function renderOverviewCrossChart() {
@@ -675,6 +879,39 @@ function applyFinanceFilters() {
 
   setText('finKpiInvest', formatTHB(invest, 0));
   setText('finKpiInvestSub', investCount + ' รายการลงทุน/โอน');
+
+  // Aggregate daily series for Finance KPI Sparklines
+  const finDayMap = {};
+  filtered.forEach(function(tx) {
+    if (!finDayMap[tx.date]) finDayMap[tx.date] = { income: 0, expense: 0, invest: 0 };
+    if (tx.type === 'Income') finDayMap[tx.date].income += tx.amount;
+    else if (tx.type === 'Expense') {
+      finDayMap[tx.date].expense += tx.amount;
+      if (tx.mainCat === 'Investment Transfer') finDayMap[tx.date].invest += tx.amount;
+    } else if (tx.type === 'Transfer') {
+      finDayMap[tx.date].invest += tx.amount;
+    }
+  });
+  const sortedFinDates = Object.keys(finDayMap).sort();
+  const incSeries = sortedFinDates.map(function(d) { return finDayMap[d].income; });
+  const expSeries = sortedFinDates.map(function(d) { return finDayMap[d].expense; });
+  const finNetSeries = sortedFinDates.map(function(d) { return finDayMap[d].income - finDayMap[d].expense; });
+  const invSeries = sortedFinDates.map(function(d) { return finDayMap[d].invest; });
+  let cumB = 0;
+  const cumExpSeries = sortedFinDates.map(function(d) { cumB += finDayMap[d].expense; return cumB; });
+
+  const sparkDark = isDarkMode();
+  const sparkStrokeDefault = sparkDark ? '#CBD5E1' : '#1C1917';
+
+  setHtml('finIncomeSparkline', renderSparklineSvg_(incSeries, { color: '#059669', width: 80, height: 26 }));
+  setHtml('finExpenseSparkline', renderSparklineSvg_(expSeries, { color: '#E11D48', width: 80, height: 26 }));
+  setHtml('finNetSparkline', renderSparklineSvg_(finNetSeries, { color: net >= 0 ? '#059669' : '#E11D48', width: 80, height: 26 }));
+  setHtml('finBudgetSparkline', renderSparklineSvg_(cumExpSeries, {
+    color: budgetPct > 100 ? '#E11D48' : (budgetPct > 80 ? '#D97706' : sparkStrokeDefault),
+    width: 80,
+    height: 26
+  }));
+  setHtml('finInvestSparkline', renderSparklineSvg_(invSeries, { color: sparkDark ? '#94A3B8' : '#57534E', width: 80, height: 26 }));
 
   if (APP_STATE.mode === 'finance') {
     renderFinanceCharts();
@@ -1318,6 +1555,37 @@ function applyNutritionFilters() {
   setText('flagCountProcessed', String(flagsCount['highly processed food']));
   setText('flagCountDessert', String(flagsCount['dessert / high added sugar']));
 
+  // Render Nutrition Target Sparklines
+  const chronoDays = (APP_STATE.nutrition.filteredDays || []).slice().reverse();
+  const nutProtSeries = chronoDays.map(function(d) { return d.proteinG; });
+  const nutCalSeries = chronoDays.map(function(d) { return d.calMid; });
+  const nutVegSeries = chronoDays.map(function(d) { return d.vegFruit; });
+  const nutFlagSeries = chronoDays.map(function(d) { return d.warningMealCount; });
+
+  setHtml('nutProteinSparkline', renderSparklineSvg_(nutProtSeries, {
+    target: 115,
+    color: avgProtein >= 115 ? '#059669' : (avgProtein >= 85 ? '#D97706' : '#E11D48'),
+    width: 80,
+    height: 26
+  }));
+  setHtml('nutCalorieSparkline', renderSparklineSvg_(nutCalSeries, {
+    target: 2100,
+    color: '#2563EB',
+    width: 80,
+    height: 26
+  }));
+  setHtml('nutVegSparkline', renderSparklineSvg_(nutVegSeries, {
+    target: 3.0,
+    color: avgVeg >= 3.0 ? '#059669' : '#D97706',
+    width: 80,
+    height: 26
+  }));
+  setHtml('nutFlagsSparkline', renderSparklineSvg_(nutFlagSeries, {
+    color: '#D97706',
+    width: 68,
+    height: 20
+  }));
+
   if (APP_STATE.mode === 'nutrition') {
     renderNutritionCharts();
   }
@@ -1808,6 +2076,81 @@ function setText(id, text) {
   if (el) el.textContent = text;
 }
 
+function setHtml(id, html) {
+  const el = document.getElementById(id);
+  if (el) el.innerHTML = html;
+}
+
+/**
+ * High-performance, zero-dependency inline SVG Sparkline generator.
+ * Renders smooth polyline, gradient fill area, optional target line, and current end-dot.
+ * @param {Array<number>} values Array of numeric values
+ * @param {Object} options Configuration { width, height, color, target, area, strokeWidth }
+ * @return {string} SVG HTML string
+ */
+function renderSparklineSvg_(values, options) {
+  options = options || {};
+  const w = options.width || 80;
+  const h = options.height || 26;
+  const padX = options.padX !== undefined ? options.padX : 3;
+  const padY = options.padY !== undefined ? options.padY : 3;
+  const strokeColor = options.color || (isDarkMode() ? '#CBD5E1' : '#475569');
+  const targetVal = typeof options.target === 'number' ? options.target : null;
+  const showArea = options.area !== false;
+
+  if (!Array.isArray(values) || values.length === 0) {
+    return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" class="overflow-visible opacity-30 block"><line x1="0" y1="' + (h / 2) + '" x2="' + w + '" y2="' + (h / 2) + '" stroke="' + strokeColor + '" stroke-dasharray="2,2" stroke-width="1"/></svg>';
+  }
+
+  const pts = values.length === 1 ? [values[0], values[0]] : values.slice();
+  let min = Math.min.apply(null, pts);
+  let max = Math.max.apply(null, pts);
+  if (targetVal !== null) {
+    min = Math.min(min, targetVal);
+    max = Math.max(max, targetVal);
+  }
+  const range = (max - min) || 1;
+  const drawW = w - padX * 2;
+  const drawH = h - padY * 2;
+
+  const coords = pts.map(function(val, idx) {
+    const x = padX + (idx / (pts.length - 1)) * drawW;
+    const y = padY + drawH - ((val - min) / range) * drawH;
+    return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+  });
+
+  const polylineStr = coords.map(function(c) { return c.x + ',' + c.y; }).join(' ');
+  const gradId = 'spk_' + Math.random().toString(36).slice(2, 8);
+
+  let targetSvg = '';
+  if (targetVal !== null) {
+    const targetY = Math.round((padY + drawH - ((targetVal - min) / range) * drawH) * 10) / 10;
+    targetSvg = '<line x1="0" y1="' + targetY + '" x2="' + w + '" y2="' + targetY + '" stroke="' + strokeColor + '" stroke-opacity="0.35" stroke-dasharray="2,2" stroke-width="1"/>';
+  }
+
+  let areaSvg = '';
+  if (showArea && coords.length > 1) {
+    const first = coords[0];
+    const last = coords[coords.length - 1];
+    const polygonPts = polylineStr + ' ' + last.x + ',' + (h - 1) + ' ' + first.x + ',' + (h - 1);
+    areaSvg = '<defs><linearGradient id="' + gradId + '" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="' + strokeColor + '" stop-opacity="0.22"/>' +
+      '<stop offset="100%" stop-color="' + strokeColor + '" stop-opacity="0.0"/>' +
+      '</linearGradient></defs>' +
+      '<polygon points="' + polygonPts + '" fill="url(#' + gradId + ')"/>';
+  }
+
+  const lastPt = coords[coords.length - 1];
+  const dotSvg = '<circle cx="' + lastPt.x + '" cy="' + lastPt.y + '" r="2" fill="' + strokeColor + '"/>';
+
+  return '<svg width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" class="overflow-visible block">' +
+    targetSvg +
+    areaSvg +
+    '<polyline points="' + polylineStr + '" fill="none" stroke="' + strokeColor + '" stroke-width="' + (options.strokeWidth || 1.75) + '" stroke-linecap="round" stroke-linejoin="round"/>' +
+    dotSvg +
+    '</svg>';
+}
+
 function formatTHB(val, decimals) {
   const num = Number(val) || 0;
   const d = decimals !== undefined ? decimals : 0;
@@ -2118,6 +2461,12 @@ function buildLocalPreviewDataset_() {
           period: '2026-10', income: 18500, expense: 4820, investmentTransfer: 2500,
           netCashflow: 13680, budgetRemaining: 5180, budgetUsedPct: 48.2,
           activeSubscriptionBurn: 858, foodExpense: 2890,
+          dailySeries: [
+            { date: '2026-10-12', income: 0, expense: 343, transfer: 0, foodExpense: 180 },
+            { date: '2026-10-15', income: 0, expense: 2500, transfer: 2500, foodExpense: 165 },
+            { date: '2026-10-16', income: 0, expense: 210, transfer: 0, foodExpense: 180 },
+            { date: '2026-10-17', income: 0, expense: 190, transfer: 0, foodExpense: 145 }
+          ],
           byCategory: { 'Food & Drink': { count: 18, amount: 2890 }, 'Transport': { count: 12, amount: 840 } },
           bySubCategory: {}, byPaymentMethod: {}
         },
@@ -2178,6 +2527,21 @@ function buildLocalPreviewDataset_() {
         { date: '2026-10-16', foodSpendTHB: 180, proteinG: 108.0, calMid: 1865 },
         { date: '2026-10-17', foodSpendTHB: 145, proteinG: 122.5, calMid: 1930 }
       ]
+    },
+    gym: {
+      available: true,
+      appUrl: '',
+      status: 'train',
+      trainedToday: false,
+      streakDays: 1,
+      maxConsecutiveDays: 2,
+      nextWorkout: 'Full Body B',
+      weeklyCount: 2,
+      weeklyTarget: 3,
+      weekStart: '2026-10-12',
+      lastSession: { date: '2026-10-16', workoutType: 'Full Body A', durationMin: 52, exerciseCount: 6, daysAgo: 1 },
+      body: { date: '2026-10-17', weightKg: 68.4, waistCm: 76.5, deltaKg: -0.2 },
+      fuel: { date: today, hasLog: true, proteinG: 98.5, calMid: 1540, mealCount: 2, proteinTargetG: 115, calorieLow: 1800, calorieHigh: 2100 }
     }
   };
 }
