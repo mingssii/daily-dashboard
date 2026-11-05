@@ -137,6 +137,24 @@ function buildWidgetSummaryPayload_(forceRefresh) {
       status: latestNut.calorieStatus || 'under'
     };
 
+    const gymData = unified.gym || { available: false, reason: 'missing' };
+    const gymWidget = gymData.available ? {
+      available: true,
+      nextRoutine: gymData.nextRoutine,
+      readinessStatus: gymData.readinessStatus,
+      trainedToday: Boolean(gymData.trainedToday),
+      consecutiveDays: Number(gymData.consecutiveDays) || 0,
+      weeklyCompleted: Number(gymData.weeklyCompleted) || 0,
+      weeklyTarget: Number(gymData.weeklyTarget) || APP_CONFIG.TARGETS.GYM_WEEKLY_SESSIONS,
+      lastSessionDate: gymData.lastSession ? gymData.lastSession.date : null,
+      latestWeightKg: gymData.latestBody ? gymData.latestBody.weightKg : null,
+      appUrlConfigured: Boolean(gymData.appUrl)
+    } : {
+      available: false,
+      reason: gymData.reason || 'unconfigured',
+      appUrlConfigured: Boolean(gymData.appUrl)
+    };
+
     return {
       success: true,
       activeMonth: activeMonth,
@@ -164,7 +182,8 @@ function buildWidgetSummaryPayload_(forceRefresh) {
           todayTHB: Math.round(todayExpense),
           monthPeriod: activeMonth,
           monthTHB: Math.round(Number(monthSum.expense) || 0)
-        }
+        },
+        gym: gymWidget
       }
     };
   } catch (err) {

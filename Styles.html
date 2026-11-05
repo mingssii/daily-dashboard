@@ -43,7 +43,7 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Harmonize Tailwind utility surfaces in Light Mode to Warm Paper (#FAF9F6 / #F5F4F0) */
+  /* Harmonize Tailwind utility surfaces & text contrast in Light Mode to Warm Paper */
   html:not(.dark) .bg-white {
     background-color: var(--bg-surface) !important;
   }
@@ -62,6 +62,38 @@
   }
   html:not(.dark) .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
     border-color: var(--border-subtle) !important;
+  }
+  html:not(.dark) .text-slate-900,
+  html:not(.dark) .text-slate-800 {
+    color: #1C1917 !important;
+  }
+  html:not(.dark) .text-slate-700,
+  html:not(.dark) .text-slate-600 {
+    color: #292524 !important;
+  }
+  html:not(.dark) .text-slate-500 {
+    color: #57534E !important;
+  }
+
+  /* Clear Typography Hierarchy for Headings & Card Labels */
+  h1, h2, h3, h4 {
+    color: var(--text-primary);
+    letter-spacing: -0.015em;
+    line-height: 1.35;
+  }
+
+  .card-heading {
+    font-size: 0.9375rem; /* 15px — crisp & legible for Thai script */
+    font-weight: 600;
+    color: var(--text-primary);
+    letter-spacing: -0.01em;
+  }
+
+  .section-heading {
+    font-size: 1.0625rem; /* 17px — clear section title */
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.015em;
   }
 
   /* Minimalist Executive Card (1px crisp border, Warm Paper surface) */
