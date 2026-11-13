@@ -4,7 +4,7 @@ Executive Single-Page Application (SPA) & Google Apps Script Web App uniting **D
 
 ## Quick Links
 
-- **GitHub Pages Interactive Showcase & Launchpad:** [https://mingssii2.github.io/daily-dashboard/](https://mingssii2.github.io/daily-dashboard/)
+- **GitHub Pages Interactive Showcase & Launchpad:** [https://mingssii.github.io/daily-dashboard/](https://mingssii.github.io/daily-dashboard/)
 - **Live Google Apps Script Vault (Real-time Sheets RPC):** [Open Live Web App](https://script.google.com/macros/s/AKfycbyq6FrcVrN1AxhWMaO8i7oFwmXIBiTrod55lCYvQrESfim4YIzHN0OJywO1rzvAKHCuQA/exec)
 - **Architecture & Planning Packet:** [`docs/AGENTS.md`](docs/AGENTS.md)
 - **iOS Scriptable Medium Widget Script:** [`ios-widget/DailyLifeWidget.js`](ios-widget/DailyLifeWidget.js)
